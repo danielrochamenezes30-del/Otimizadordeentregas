@@ -512,7 +512,7 @@
         let startingAddress = '';
         let lastOptimizedRoute = [];
         let currentView = 'route-view';
-        let authReady = false;
+        let authReady = false; // Flag para indicar se a verificação inicial terminou
 
         // Elementos DOM
         const loginContainer = document.getElementById('login-container');
@@ -523,9 +523,9 @@
         const loginButton = document.getElementById('google-login-button');
         const loadingSpinner = document.getElementById('loading-spinner');
         const staticIcon = document.getElementById('static-icon');
-        const emailVerificationBar = document.getElementById('email-verification-bar'); // <-- Novo
-        const resendVerificationButton = document.getElementById('resend-verification-button'); // <-- Novo
-        const resendStatusElement = document.getElementById('resend-status'); // <-- Novo
+        const emailVerificationBar = document.getElementById('email-verification-bar');
+        const resendVerificationButton = document.getElementById('resend-verification-button');
+        const resendStatusElement = document.getElementById('resend-status');
 
 
         // Configuração Firebase (Sua Configuração)
@@ -571,7 +571,7 @@
                 // --- INÍCIO: Lógica de Autenticação com Verificação ---
                 onAuthStateChanged(auth, async (user) => {
                      console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null', "Email Verificado:", user ? user.emailVerified : 'N/A');
-                     authReady = true;
+                     authReady = true; // Marca como pronto após a primeira verificação
 
                      if (user) {
                          // Usuário LOGADO
@@ -585,19 +585,31 @@
                          // Verifica e envia email de verificação se necessário
                          if (!user.emailVerified) {
                              console.log("E-mail não verificado. Tentando enviar verificação...");
-                             sendEmailVerification(user)
-                                 .then(() => {
-                                     console.log("E-mail de verificação enviado (ou reenviado).");
-                                     if (emailVerificationBar) emailVerificationBar.style.display = 'block'; // Mostra a barra
-                                     if (resendStatusElement) resendStatusElement.textContent = 'E-mail enviado!';
-                                     if (resendVerificationButton) resendVerificationButton.disabled = false;
-                                 })
-                                 .catch((error) => {
-                                     console.error("Erro ao enviar e-mail de verificação:", error);
-                                     if (emailVerificationBar) emailVerificationBar.style.display = 'block'; // Mostra mesmo com erro
-                                     if (resendStatusElement) resendStatusElement.textContent = `Erro: ${error.code}`;
-                                     if (resendVerificationButton) resendVerificationButton.disabled = false;
-                                 });
+                             // Verifica se já enviamos recentemente para evitar spam
+                             const lastSent = sessionStorage.getItem('verificationEmailSent');
+                             const now = Date.now();
+                             // Só envia se não houver registro ou se passou mais de 60 segundos
+                             if (!lastSent || (now - parseInt(lastSent)) > 60000) {
+                                sendEmailVerification(user)
+                                    .then(() => {
+                                        sessionStorage.setItem('verificationEmailSent', now.toString()); // Salva timestamp
+                                        console.log("E-mail de verificação enviado.");
+                                        if (emailVerificationBar) emailVerificationBar.style.display = 'block';
+                                        if (resendStatusElement) resendStatusElement.textContent = 'E-mail enviado!';
+                                        if (resendVerificationButton) resendVerificationButton.disabled = false;
+                                    })
+                                    .catch((error) => {
+                                        console.error("Erro ao enviar e-mail de verificação:", error);
+                                        if (emailVerificationBar) emailVerificationBar.style.display = 'block';
+                                        if (resendStatusElement) resendStatusElement.textContent = `Erro ao enviar: ${error.code}`;
+                                        if (resendVerificationButton) resendVerificationButton.disabled = false;
+                                    });
+                             } else {
+                                 console.log("Envio de verificação pulado (muito recente).");
+                                 if (emailVerificationBar) emailVerificationBar.style.display = 'block'; // Mostra a barra mesmo assim
+                                 if (resendStatusElement) resendStatusElement.textContent = 'Verifique seu e-mail.';
+                                 if (resendVerificationButton) resendVerificationButton.disabled = false;
+                             }
                          } else {
                              console.log("E-mail já verificado.");
                              if (emailVerificationBar) emailVerificationBar.style.display = 'none'; // Esconde a barra
@@ -650,6 +662,7 @@
                  updateLoginUI(true, "Autenticado com sucesso! Carregando dados...");
              } catch (error) {
                  console.error("Erro ao iniciar signInWithPopup:", error);
+                 // Códigos comuns: 'auth/popup-closed-by-user', 'auth/cancelled-popup-request'
                  updateLoginUI(false, `Erro: ${error.code} - ${error.message}`, true);
              }
          };
@@ -661,8 +674,10 @@
                 console.warn("Nenhum usuário logado para reenviar verificação.");
                 return;
             }
+            // Recarrega o estado do usuário para garantir que emailVerified está atualizado
+            await user.reload();
             if (user.emailVerified) {
-                console.log("E-mail já está verificado.");
+                console.log("E-mail já está verificado (após reload).");
                 if (emailVerificationBar) emailVerificationBar.style.display = 'none';
                 return;
             }
@@ -682,6 +697,7 @@
                 }, 30000); // Espera 30 segundos
             } catch (error) {
                 console.error("Erro ao reenviar e-mail:", error);
+                 // Erro comum: 'auth/too-many-requests'
                 if (resendStatusElement) resendStatusElement.textContent = `Erro: ${error.code}`;
                 if (resendVerificationButton) resendVerificationButton.disabled = false; // Reabilita em caso de erro
             }
