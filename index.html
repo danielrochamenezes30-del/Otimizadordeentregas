@@ -294,10 +294,9 @@
                     <!-- Seção Endereço de Partida -->
                     <section id="start-address-section" class="card p-6 mb-8">
                         <h2 class="text-xl font-semibold mb-3 text-slate-800">Endereço de Partida (Base)</h2>
-                        <!-- CEP Lookup -->
                         <div class="grid grid-cols-3 gap-2 items-end mb-4">
                              <div class="col-span-2">
-                                 <label for="start-cep" class="block text-sm font-medium mb-1">CEP</label>
+                                 <label for="start-cep" class="block text-sm font-medium mb-1">CEP (Opcional)</label>
                                  <input type="text" id="start-cep" placeholder="Apenas números" maxlength="9" class="cep-input w-full">
                              </div>
                              <button id="start-cep-lookup-button" onclick="fetchBaseAddressByCEP()" class="btn btn-lookup">
@@ -306,83 +305,49 @@
                              </button>
                         </div>
                         <p id="start-cep-error" class="text-xs text-red-500 mb-2" style="display: none;"></p>
-                        <!-- Campos Manuais -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                            <div>
-                                <label for="start-street" class="block text-sm font-medium mb-1">Rua / Logradouro</label>
-                                <input type="text" id="start-street" placeholder="Ex: Rua Fernando Costa" class="form-input w-full">
-                            </div>
-                             <div>
-                                <label for="start-number" class="block text-sm font-medium mb-1">Número</label>
-                                <input type="text" id="start-number" placeholder="Ex: 852" class="form-input w-full">
-                            </div>
-                            <div>
-                                <label for="start-neighborhood" class="block text-sm font-medium mb-1">Bairro</label>
-                                <input type="text" id="start-neighborhood" placeholder="Ex: Santa Rita" class="form-input w-full">
-                            </div>
-                            <div>
-                                <label for="start-city" class="block text-sm font-medium mb-1">Cidade</label>
-                                <input type="text" id="start-city" placeholder="Ex: Poções" class="form-input w-full">
-                            </div>
-                             <div>
-                                <label for="start-uf" class="block text-sm font-medium mb-1">UF</label>
-                                <input type="text" id="start-uf" placeholder="Ex: BA" maxlength="2" class="form-input w-full uppercase">
-                            </div>
+                        <div>
+                             <label for="start-address" class="block text-sm font-medium mb-1">Seu endereço base (Loja/Depósito)</label>
+                             <input type="text" id="start-address" placeholder="Ex: Av. Principal, 1000, Centro, Sua Cidade - UF" class="form-input w-full">
+                             <p class="text-xs text-slate-500 mt-1">Este endereço é o ponto inicial. A rota será organizada a partir daqui.</p>
                         </div>
-                        <p class="text-xs text-slate-500 mt-3">Preencha o CEP e clique em buscar, ou digite os dados manualmente.</p>
                     </section>
 
                     <!-- Formulário de Adição -->
                     <section id="add-delivery-form" class="card p-6 mb-8">
                          <h2 class="text-xl font-semibold mb-4 text-slate-800">Adicionar Nova Entrega</h2>
-                         <!-- CEP Lookup -->
-                         <div class="grid grid-cols-3 gap-2 items-end mb-4">
-                             <div class="col-span-2">
-                                 <label for="delivery-cep" class="block text-sm font-medium mb-1">CEP</label>
-                                 <input type="text" id="delivery-cep" placeholder="Apenas números" maxlength="9" class="cep-input w-full">
+                         <div class="grid grid-cols-1 gap-4">
+                             <div class="grid grid-cols-3 gap-2 items-end">
+                                 <div class="col-span-2">
+                                     <label for="cep" class="block text-sm font-medium mb-1">CEP (Opcional)</label>
+                                     <input type="text" id="cep" placeholder="Apenas números" maxlength="9" class="cep-input w-full">
+                                 </div>
+                                 <button id="cep-lookup-button" onclick="fetchAddressByCEP()" class="btn btn-lookup">
+                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+                                      Buscar
+                                 </button>
                              </div>
-                             <button id="delivery-cep-lookup-button" onclick="fetchAddressByCEP()" class="btn btn-lookup">
-                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
-                                 Buscar
-                             </button>
-                         </div>
-                         <p id="delivery-cep-error" class="text-xs text-red-500 mt-1 mb-3" style="display: none;"></p>
-                         <!-- Campos Manuais -->
-                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <p id="cep-error" class="text-xs text-red-500 mt-1" style="display: none;"></p>
                              <div>
-                                <label for="delivery-street" class="block text-sm font-medium mb-1">Rua / Logradouro</label>
-                                <input type="text" id="delivery-street" placeholder="Ex: Rua Alcides Campos" class="form-input w-full">
-                             </div>
-                              <div>
-                                 <label for="delivery-number" class="block text-sm font-medium mb-1">Número</label>
-                                 <input type="text" id="delivery-number" placeholder="Ex: 123" class="form-input w-full">
+                                 <label for="address" class="block text-sm font-medium mb-1">Endereço Completo</label>
+                                 <input type="text" id="address" placeholder="Ex: Rua Exemplo, 123, Bairro Ex., Cidade - UF" class="form-input w-full">
                              </div>
                              <div>
-                                <label for="delivery-neighborhood" class="block text-sm font-medium mb-1">Bairro</label>
-                                <input type="text" id="delivery-neighborhood" placeholder="Ex: Alto da Vitória" class="form-input w-full">
-                            </div>
-                            <div>
-                                <label for="delivery-city" class="block text-sm font-medium mb-1">Cidade</label>
-                                <input type="text" id="delivery-city" placeholder="Ex: Poções" class="form-input w-full">
-                            </div>
-                             <div>
-                                <label for="delivery-uf" class="block text-sm font-medium mb-1">UF</label>
-                                <input type="text" id="delivery-uf" placeholder="Ex: BA" maxlength="2" class="form-input w-full uppercase">
+                                 <label for="neighborhood" class="block text-sm font-medium mb-1">Bairro</label>
+                                 <input type="text" id="neighborhood" placeholder="Ex: Bairro Exemplo" class="form-input w-full">
                              </div>
-
                              <div>
-                                  <label class="block text-sm font-medium mb-1">Tamanho do Pacote</label>
-                                  <div class="flex items-center gap-4 mt-1">
-                                       <label class="radio-label inline-flex items-center"><input type="radio" name="size" value="Pequeno" class="form-radio mr-1" checked>Pequeno</label>
-                                       <label class="radio-label inline-flex items-center"><input type="radio" name="size" value="Grande" class="form-radio mr-1">Grande</label>
-                                  </div>
+                                 <label class="block text-sm font-medium mb-1">Tamanho do Pacote</label>
+                                 <div class="flex items-center gap-4 mt-1">
+                                      <label class="radio-label inline-flex items-center"><input type="radio" name="size" value="Pequeno" class="form-radio mr-1" checked>Pequeno</label>
+                                      <label class="radio-label inline-flex items-center"><input type="radio" name="size" value="Grande" class="form-radio mr-1">Grande</label>
+                                 </div>
                              </div>
-                        </div>
-                        <div class="text-right mt-4">
-                            <button onclick="addDelivery()" class="btn btn-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5V4.75Z" /></svg>
-                                Adicionar Entrega
-                            </button>
+                             <div class="text-right">
+                                 <button onclick="addDelivery()" class="btn btn-primary">
+                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5V4.75Z" /></svg>
+                                      Adicionar Entrega
+                                 </button>
+                             </div>
                          </div>
                     </section>
 
@@ -397,7 +362,7 @@
                            <div class="text-right mt-4">
                                 <button id="search-cep-button" onclick="searchCEPsByAddress()" class="btn btn-lookup">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
-                                    Buscar CEPs
+                                     Buscar CEPs
                                 </button>
                            </div>
                            <div id="cep-results" class="mt-4" style="display: none;"></div>
@@ -612,7 +577,7 @@
                     }
                     userId = user.uid;
                     console.log("Estado: LOGADO.", user.displayName, userId); // Log K
-                    if (userDisplayElement) { /* ... atualiza nome ... */ }
+                    if (userDisplayElement) { userDisplayElement.textContent = user.displayName || user.email || `Usuário ${userId.substring(0,6)}...`; userDisplayElement.title = user.email || `ID: ${userId}`; }
                     // Lógica de verificação de email removida para simplificar
 
                     // Garante que a UI de login está escondida e o app visível
@@ -703,8 +668,24 @@
               const collRef = getFirestoreCollection('deliveries');
               const cepErrorEl = document.getElementById('cep-error'); // ID correto
 
-              if (!firebaseInitialized || !auth.currentUser || !userId || !db) { /* ... verificação ... */ return; }
-              if (!collRef) { /* ... erro DB ... */ return; }
+              // Verificação reforçada
+              if (!firebaseInitialized || !auth.currentUser || !userId || !db) {
+                   console.warn("Tentativa de adicionar entrega antes da autenticação/DB estar pronto. User:", auth.currentUser, "UserID:", userId, "DB:", db);
+                   if(cepErrorEl){
+                       cepErrorEl.textContent="Aguardando conexão/autenticação... Tente novamente em alguns segundos.";
+                       cepErrorEl.style.display='block';
+                   }
+                   return;
+               }
+
+              if (!collRef) {
+                  console.error("Falha ao obter referência da coleção 'deliveries'.");
+                   if(cepErrorEl){
+                       cepErrorEl.textContent="Erro DB: Não foi possível acessar o banco de dados.";
+                       cepErrorEl.style.display='block';
+                   }
+                  return;
+              }
 
               // Pega valores dos campos
               const addressInput = document.getElementById('address');
@@ -743,7 +724,13 @@
                        cepInput.value = '';
                        document.querySelector('input[name="size"][value="Pequeno"]').checked = true;
                    })
-                   .catch(error => { /* ... log erro ... */ });
+                   .catch(error => {
+                       console.error("Firestore addDoc Error:", error.code, error.message, error); // Log detalhado
+                       if (cepErrorEl) {
+                           cepErrorEl.textContent = `Erro DB ao salvar: ${error.message} (Código: ${error.code})`; // Inclui código do erro
+                           cepErrorEl.style.display = 'block';
+                       }
+                   });
         }
         function loadDeliveries() { /* ... código igual ... */ }
         window.toggleDeliveryStatus = async (deliveryId, currentStatus) => { /* ... código igual ... */ };
@@ -788,43 +775,63 @@
             const errorElement = document.getElementById('cep-error'); // ID correto
             const lookupButton = document.getElementById('cep-lookup-button'); // ID correto
 
-            if (!cepInput || !addressInput || !neighborhoodInput || !errorElement || !lookupButton) return;
-            if (cep.length !== 8) { /* ... validação ... */ return; }
+            if (!cepInput || !addressInput || !neighborhoodInput || !errorElement || !lookupButton) {
+                 console.error("Elementos CEP entrega não encontrados."); return;
+            }
+            if (cep.length !== 8) {
+                 errorElement.textContent = "CEP inválido. Deve conter 8 dígitos."; errorElement.style.display = 'block'; return;
+            }
+            if(errorElement) errorElement.style.display = 'none'; // Limpa erro anterior
 
-            lookupButton.disabled = true; /* ... UI loading ... */
+            lookupButton.disabled = true; lookupButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" ...></svg> Buscando...`;
 
             try {
                 const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
                 if (!response.ok) throw new Error(`Erro API ViaCEP: ${response.status}`);
                 const data = await response.json();
+                console.log("ViaCEP (Entrega) response:", data); // Log
 
-                if (data.erro) { /* ... erro CEP não encontrado ... */ }
-                else {
-                    // Monta endereço no formato Rua, Cidade - UF (sem número e bairro aqui)
+                if (data.erro) {
+                    errorElement.textContent = "CEP não encontrado."; errorElement.style.display = 'block';
+                } else {
+                    // Monta endereço no formato Rua, [NÚMERO], Cidade - UF (sem bairro aqui)
                     let fullAddress = `${data.logradouro || ''}`;
-                    if(data.localidade) fullAddress += `, ${data.localidade}`;
-                    if(data.uf) fullAddress += ` - ${data.uf}`;
-                    addressInput.value = fullAddress.replace(/^,\s*/, '').trim(); // Remove vírgula inicial se logradouro for vazio
+                    // Adiciona placeholder de número apenas se tiver logradouro
+                    if(data.logradouro) fullAddress += `, [NÚMERO]`;
+                    if(data.localidade) fullAddress += `${fullAddress ? ', ' : ''}${data.localidade}`;
+                    if(data.uf) fullAddress += `${fullAddress ? ' - ' : ''}${data.uf}`;
 
+                    addressInput.value = fullAddress.trim();
                     neighborhoodInput.value = data.bairro || ''; // Preenche bairro separado
-                    // Poderia focar no campo número aqui, se existisse um
+                    // Poderia focar no campo número se existisse
                 }
-            } catch (error) { /* ... trata erro ... */ }
-            finally { lookupButton.disabled = false; /* ... restaura botão ... */ }
+            } catch (error) {
+                 console.error("Erro fetchAddressByCEP:", error);
+                 errorElement.textContent = `Erro: ${error.message}. Verifique a conexão.`; errorElement.style.display = 'block';
+             }
+            finally {
+                 lookupButton.disabled = false;
+                 lookupButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar`;
+            }
         }
 
         // Busca CEP para Endereço Base - PREENCHE start-address
         window.fetchBaseAddressByCEP = async function() {
-            const cepInput = document.getElementById('start-cep');
+            const cepInput = document.getElementById('start-cep'); // ID Correto
             const cep = cepInput ? cepInput.value.replace(/\D/g, '') : '';
             const addressInput = document.getElementById('start-address'); // Campo único base
-            const errorElement = document.getElementById('start-cep-error');
-            const lookupButton = document.getElementById('start-cep-lookup-button');
+            const errorElement = document.getElementById('start-cep-error'); // ID Correto
+            const lookupButton = document.getElementById('start-cep-lookup-button'); // ID Correto
 
             let newAddressToSave = null;
 
-            if (!cepInput || !addressInput || !errorElement || !lookupButton) return;
-            if (cep.length !== 8) { /* ... validação ... */ return; }
+            if (!cepInput || !addressInput || !errorElement || !lookupButton) {
+                 console.error("Elementos CEP base não encontrados."); return;
+            }
+            if (cep.length !== 8) {
+                 errorElement.textContent = "CEP inválido. Deve conter 8 dígitos."; errorElement.style.display = 'block'; return;
+             }
+             if(errorElement) errorElement.style.display = 'none'; // Limpa erro anterior
 
             lookupButton.disabled = true; /* ... UI loading ... */
 
@@ -832,26 +839,47 @@
                 const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
                 if (!response.ok) throw new Error(`Erro API ViaCEP: ${response.status}`);
                 const data = await response.json();
+                console.log("ViaCEP (Base) response:", data); // Log
 
-                if (data.erro) { /* ... erro CEP não encontrado ... */ }
+                if (data.erro) {
+                    errorElement.textContent = "CEP não encontrado."; errorElement.style.display = 'block';
+                 }
                 else {
                     // Monta endereço: Rua, [NÚMERO], Bairro, Cidade - UF
-                    let fullAddress = `${data.logradouro || ''}, [NÚMERO]`; // Adiciona placeholder número
-                    if(data.bairro) fullAddress += `, ${data.bairro}`;
-                    if(data.localidade) fullAddress += `, ${data.localidade}`;
-                    if(data.uf) fullAddress += ` - ${data.uf}`;
+                    let fullAddress = `${data.logradouro || ''}`;
+                    if (data.logradouro) fullAddress += `, [NÚMERO]`; // Placeholder número
+                    if(data.bairro) fullAddress += `${fullAddress ? ', ' : ''}${data.bairro}`;
+                    if(data.localidade) fullAddress += `${fullAddress ? ', ' : ''}${data.localidade}`;
+                    if(data.uf) fullAddress += `${fullAddress ? ' - ' : ''}${data.uf}`;
+
                     addressInput.value = fullAddress.replace(/^,\s*\[NÚMERO\]/, '[NÚMERO]').replace(/,\s*,/g, ',').trim(); // Limpa vírgulas extras
                     newAddressToSave = addressInput.value; // Prepara para salvar
+                    // Foca no campo de endereço para o usuário editar o número
+                    addressInput.focus();
+                    // Tenta selecionar o placeholder [NÚMERO]
+                    const placeholderIndex = addressInput.value.indexOf('[NÚMERO]');
+                    if (placeholderIndex !== -1) {
+                         setTimeout(() => { // Timeout para garantir que o focus ocorreu
+                              addressInput.setSelectionRange(placeholderIndex, placeholderIndex + '[NÚMERO]'.length);
+                         }, 0);
+                    }
                 }
-            } catch (error) { /* ... trata erro ... */ }
-            finally { lookupButton.disabled = false; /* ... restaura botão ... */ }
+            } catch (error) {
+                 console.error("Erro fetchBaseAddressByCEP:", error);
+                 errorElement.textContent = `Erro: ${error.message}. Verifique a conexão.`; errorElement.style.display = 'block';
+            }
+            finally {
+                 lookupButton.disabled = false;
+                 lookupButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar`;
+            }
 
             if (newAddressToSave) {
                 await saveSettings({ startingAddress: newAddressToSave }); // Salva a string no DB
             }
         }
 
-        // Busca CEPs por Endereço (igual)
+
+        // Busca CEPs por Endereço (igual, com logs)
         window.searchCEPsByAddress = async function() { /* ... código igual (com logs) ... */ }
 
 
