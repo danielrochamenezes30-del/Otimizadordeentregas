@@ -708,10 +708,31 @@
 
             console.log(`optimizeAndRenderRoutes chamado. isInitialLoad: ${isInitialLoad}, startAddr: ${startAddr}, deliveriesToOptimize: ${deliveriesToOptimize.length}`);
 
-            if (!startAddr && deliveriesToOptimize.length > 0) { /* ... fallback básico ... */ return; }
-            if (deliveriesToOptimize.length === 0) { /* ... lista vazia ... */ return; }
+            if (!startAddr && deliveriesToOptimize.length > 0) {
+                 console.warn("Endereço de partida não definido. Usando ordenação básica.");
+                 if (routeStatus && !isInitialLoad) routeStatus.textContent = "Ordenação básica (Defina um endereço de partida).";
+                 const basicSorted = basicSortDeliveries(allDeliveries);
+                 lastOptimizedRoute = basicSorted; // Salva a rota (mesmo básica)
+                 if (currentView === 'route-view') { // Só renderiza se na view correta
+                      renderRouteList(basicSorted, true, {});
+                 }
+                 return;
+            }
+            if (deliveriesToOptimize.length === 0) {
+                 console.log("Nenhuma entrega pendente/não em casa para otimizar.");
+                 lastOptimizedRoute = []; // Limpa a rota otimizada
+                 if (currentView === 'route-view') { // Só renderiza se na view correta
+                      renderRouteList([], true, {}); // Mostra lista vazia na aba Rota
+                 }
+                 if (routeStatus) routeStatus.style.display = 'none';
+                 return;
+            }
 
-            if (!isInitialLoad && routeStatus) { /* ... UI loading ... */ }
+
+            if (!isInitialLoad && routeStatus) {
+                 routeStatus.textContent = "Buscando coordenadas...";
+                 routeStatus.style.display = 'block';
+            }
 
             try {
                 // Chave V1 (como no código original)
@@ -748,19 +769,75 @@
                 }
                 console.log("Coordenadas obtidas:", coordinates);
 
+                 // Verifica se a coordenada de partida (índice 0) é válida
+                 if (!coordinates[0]) {
+                     throw new Error(`Falha ao encontrar coordenadas do endereço de partida "${startAddr}". Verifique o endereço.`);
+                 }
+
+
                 const validDeliveriesWithCoords = deliveriesToOptimize
-                    .map((delivery, index) => ({ /* ... monta obj com coords ... */ }))
+                    .map((delivery, index) => ({
+                         ...delivery,
+                         coords: coordinates[index + 1] ? { latitude: coordinates[index + 1][1], longitude: coordinates[index + 1][0] } : null
+                     }))
                     .filter(d => d.coords !== null);
 
-                 if (validDeliveriesWithCoords.length === 0) { /* ... trata caso sem entregas válidas ... */ return; }
+                 if (validDeliveriesWithCoords.length === 0) {
+                     // Se não tem válidas, mas tem falhas
+                     if (Object.keys(failedDeliveries).length > 0) {
+                        console.warn("Nenhuma entrega válida encontrada, mostrando falhas.");
+                        lastOptimizedRoute = []; // Nenhuma rota otimizada
+                         if (currentView === 'route-view') {
+                            renderRouteList([], true, failedDeliveries); // Usa modo básico para mostrar falhas
+                        }
+                        if (routeStatus && !isInitialLoad) routeStatus.textContent = "Nenhuma entrega pôde ser localizada.";
+                     } else { // Se não tem nem válidas nem falhas (lista inicial vazia)
+                        console.log("Nenhuma entrega válida ou com falha para processar.");
+                        lastOptimizedRoute = [];
+                         if (currentView === 'route-view') {
+                            renderRouteList([], true, {});
+                        }
+                        if (routeStatus) routeStatus.style.display = 'none';
+                     }
+                    return; // Interrompe aqui se não há entregas válidas
+                 }
+
 
                 // Otimização (Vizinho Mais Próximo)
-                /* ... lógica de otimização igual ... */
+                if (!isInitialLoad && routeStatus) routeStatus.textContent = `Calculando rota para ${validDeliveriesWithCoords.length} entregas...`;
+                let currentCoords = { latitude: coordinates[0][1], longitude: coordinates[0][0] }; // Usa a coordenada de partida validada
+                let remainingValidDeliveries = [...validDeliveriesWithCoords];
+                let optimizedRoute = [];
+
+                while (remainingValidDeliveries.length > 0) {
+                    let closestDistance = Infinity;
+                    let closestIndex = -1;
+                    remainingValidDeliveries.forEach((delivery, index) => {
+                        const distance = getHaversineDistance(currentCoords, delivery.coords);
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            closestIndex = index;
+                        }
+                    });
+                    const closestDelivery = remainingValidDeliveries.splice(closestIndex, 1)[0];
+                    closestDelivery.distanceFromPrevious = closestDistance;
+                    optimizedRoute.push(closestDelivery);
+                    currentCoords = closestDelivery.coords;
+                }
+
                 console.log("Rota otimizada:", optimizedRoute);
                 lastOptimizedRoute = optimizedRoute;
 
-                if (routeStatus && !isInitialLoad) { /* ... atualiza status UI ... */ }
-                else if (routeStatus) { routeStatus.style.display = 'none'; }
+                if (routeStatus && !isInitialLoad) {
+                     let statusMsg = `Rota otimizada para ${optimizedRoute.length} entregas!`;
+                     if (Object.keys(failedDeliveries).length > 0) {
+                         statusMsg += ` (${Object.keys(failedDeliveries).length} não localizadas).`;
+                     }
+                     routeStatus.textContent = statusMsg;
+                 } else if (routeStatus) {
+                     routeStatus.style.display = 'none';
+                 }
+
 
                 if (currentView === 'route-view') {
                     renderRouteList(optimizedRoute, false, failedDeliveries);
@@ -772,7 +849,7 @@
                 const basicSorted = basicSortDeliveries(allDeliveries);
                 lastOptimizedRoute = basicSorted;
                 if (currentView === 'route-view') {
-                    renderRouteList(basicSorted, true, failedDeliveries);
+                    renderRouteList(basicSorted, true, failedDeliveries); // Mostra falhas mesmo no fallback
                 }
             }
         }
@@ -791,10 +868,10 @@
             if (!cepInput || !addressInput || !neighborhoodInput || !errorElement || !lookupButton) {
                  console.error("Elementos CEP entrega não encontrados."); return;
             }
-            if (cep.length !== 8) { /* ... validação ... */ return; }
+            if (cep.length !== 8) { errorElement.textContent = "CEP inválido. Deve conter 8 dígitos."; errorElement.style.display = 'block'; return; }
             if(errorElement) errorElement.style.display = 'none';
 
-            lookupButton.disabled = true; lookupButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" ...></svg> Buscando...`;
+            lookupButton.disabled = true; lookupButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Buscando...`;
 
             try {
                 const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
@@ -802,26 +879,29 @@
                 const data = await response.json();
                 console.log("ViaCEP (Entrega) response:", data);
 
-                if (data.erro) { /* ... erro CEP não encontrado ... */ }
+                if (data.erro) { errorElement.textContent = "CEP não encontrado."; errorElement.style.display = 'block'; }
                 else {
                     let fullAddress = `${data.logradouro || ''}`;
-                    // Adiciona placeholder [NÚMERO] apenas se houver logradouro
                     if(data.logradouro) fullAddress += `, [NÚMERO]`;
+                    // Não adiciona bairro aqui, ele vai no campo separado
                     if(data.localidade) fullAddress += `${fullAddress ? ', ' : ''}${data.localidade}`;
                     if(data.uf) fullAddress += `${fullAddress ? ' - ' : ''}${data.uf}`;
-                    // Preenche o campo address com a string montada (sem bairro)
-                    addressInput.value = fullAddress.replace(/^,\s*\[NÚMERO\]/, '[NÚMERO]').trim(); // Limpa vírgula inicial se logradouro for vazio
-
-                    neighborhoodInput.value = data.bairro || ''; // Preenche bairro separado
-                    // Tenta focar e selecionar [NÚMERO] no campo address
+                    addressInput.value = fullAddress.replace(/^,\s*\[NÚMERO\]/, '[NÚMERO]').trim();
+                    neighborhoodInput.value = data.bairro || '';
                     addressInput.focus();
                     const placeholderIndex = addressInput.value.indexOf('[NÚMERO]');
                     if (placeholderIndex !== -1) {
                          setTimeout(() => { addressInput.setSelectionRange(placeholderIndex, placeholderIndex + '[NÚMERO]'.length); }, 0);
                     }
                 }
-            } catch (error) { /* ... trata erro ... */ }
-            finally { lookupButton.disabled = false; /* ... restaura botão ... */ }
+            } catch (error) {
+                 console.error("Erro fetchAddressByCEP:", error);
+                 errorElement.textContent = `Erro: ${error.message}. Verifique a conexão.`; errorElement.style.display = 'block';
+             }
+            finally {
+                 lookupButton.disabled = false;
+                 lookupButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar`;
+            }
         }
 
         // Busca CEP para Endereço Base (Corrigida)
@@ -837,10 +917,10 @@
             if (!cepInput || !addressInput || !errorElement || !lookupButton) {
                  console.error("Elementos CEP base não encontrados."); return;
             }
-            if (cep.length !== 8) { /* ... validação ... */ return; }
+            if (cep.length !== 8) { errorElement.textContent = "CEP inválido. Deve conter 8 dígitos."; errorElement.style.display = 'block'; return; }
             if(errorElement) errorElement.style.display = 'none';
 
-            lookupButton.disabled = true; /* ... UI loading ... */
+            lookupButton.disabled = true; lookupButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" ...></svg> Buscando...`;
 
             try {
                 const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
@@ -848,9 +928,8 @@
                 const data = await response.json();
                 console.log("ViaCEP (Base) response:", data);
 
-                if (data.erro) { /* ... erro CEP não encontrado ... */ }
+                if (data.erro) { errorElement.textContent = "CEP não encontrado."; errorElement.style.display = 'block'; }
                 else {
-                    // Monta endereço completo no formato original
                     let fullAddress = `${data.logradouro || ''}`;
                     if (data.logradouro) fullAddress += `, [NÚMERO]`; // Placeholder número
                     if(data.bairro) fullAddress += `${fullAddress ? ', ' : ''}${data.bairro}`;
@@ -859,15 +938,20 @@
 
                     addressInput.value = fullAddress.replace(/^,\s*\[NÚMERO\]/, '[NÚMERO]').replace(/,\s*,/g, ',').trim();
                     newAddressToSave = addressInput.value;
-                    // Foca e seleciona [NÚMERO]
                     addressInput.focus();
                     const placeholderIndex = addressInput.value.indexOf('[NÚMERO]');
                     if (placeholderIndex !== -1) {
                          setTimeout(() => { addressInput.setSelectionRange(placeholderIndex, placeholderIndex + '[NÚMERO]'.length); }, 0);
                     }
                 }
-            } catch (error) { /* ... trata erro ... */ }
-            finally { lookupButton.disabled = false; /* ... restaura botão ... */ }
+            } catch (error) {
+                console.error("Erro fetchBaseAddressByCEP:", error);
+                errorElement.textContent = `Erro: ${error.message}. Verifique a conexão.`; errorElement.style.display = 'block';
+            }
+            finally {
+                 lookupButton.disabled = false;
+                 lookupButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar`;
+            }
 
             if (newAddressToSave) {
                 await saveSettings({ startingAddress: newAddressToSave });
