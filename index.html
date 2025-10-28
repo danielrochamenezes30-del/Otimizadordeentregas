@@ -597,7 +597,12 @@
                                         if (resendStatusElement) resendStatusElement.textContent = 'E-mail enviado!';
                                         if (resendVerificationButton) resendVerificationButton.disabled = false;
                                     })
-                                    .catch((error) => { /* ... tratar erro ... */ });
+                                    .catch((error) => {
+                                        console.error("Erro ao enviar email de verificação:", error);
+                                        if (emailVerificationBar) emailVerificationBar.style.display = 'block';
+                                        if (resendStatusElement) resendStatusElement.textContent = `Erro ao enviar: ${error.code}`;
+                                        if (resendVerificationButton) resendVerificationButton.disabled = false; // Reabilita em caso de erro
+                                     });
                              } else {
                                  console.log("Envio de verificação pulado (muito recente).");
                                  if (emailVerificationBar) emailVerificationBar.style.display = 'block';
@@ -673,9 +678,13 @@
             if (resendStatusElement) resendStatusElement.textContent = 'Enviando...';
             try {
                 await sendEmailVerification(user);
+                sessionStorage.setItem('verificationEmailSent', Date.now().toString()); // Atualiza timestamp
                 console.log("E-mail de verificação reenviado.");
                 if (resendStatusElement) resendStatusElement.textContent = 'Reenviado!';
-                setTimeout(() => { /* ... reabilitar botão ... */ }, 30000);
+                setTimeout(() => {
+                    if (resendVerificationButton) resendVerificationButton.disabled = false;
+                    if (resendStatusElement) resendStatusElement.textContent = '';
+                 }, 30000); // Espera 30 segundos
             } catch (error) {
                 console.error("Erro ao reenviar e-mail:", error);
                 if (resendStatusElement) resendStatusElement.textContent = `Erro: ${error.code}`;
@@ -685,30 +694,478 @@
 
 
         // Logout
-        window.logout = async () => { /* ... igual antes ... */ };
+        window.logout = async () => { if (!auth || !firebaseInitialized) return; try { await signOut(auth); } catch (error) { console.error("Erro ao sair:", error); } };
 
         // --- Controle de Visualização ---
-        window.showView = (viewId) => { /* ... igual antes ... */ };
+        window.showView = (viewId) => {
+             console.log("Mudando para view:", viewId);
+             currentView = viewId;
+             const routeV = document.getElementById('route-view');
+             const mgmtV = document.getElementById('management-view');
+             if (routeV) routeV.style.display = 'none';
+             if (mgmtV) mgmtV.style.display = 'none';
 
-        // --- Funções Firebase (com verificações) ---
-        // (código igual ao anterior)
-        function getFirestoreCollection(collectionName) { /* ... */ }
-        function getFirestoreDoc(collectionName, docId) { /* ... */ }
-        function getSettingsDocRef() { /* ... */ }
-        async function saveSettings(settingsData) { /* ... */ }
-        async function loadSettings() { /* ... */ }
-        window.addDelivery = function() { /* ... */ }
-        function loadDeliveries() { /* ... */ }
-        window.toggleDeliveryStatus = async (deliveryId, currentStatus) => { /* ... */ };
-        window.deleteDelivery = function(deliveryId) { /* ... */ };
+             const targetView = document.getElementById(viewId);
+             if (targetView) targetView.style.display = 'block';
 
-        // --- Otimização, Busca CEP, Renderização, etc ---
+             const navRoute = document.getElementById('nav-route');
+             const navMgmt = document.getElementById('nav-management');
+             if (navRoute) navRoute.classList.toggle('active', viewId === 'route-view');
+             if (navMgmt) navMgmt.classList.toggle('active', viewId === 'management-view');
+
+             if (viewId === 'management-view') {
+                 renderManagementList(currentDeliveries);
+             } else if (firebaseInitialized) {
+                 optimizeAndRenderRoutes(currentDeliveries, true);
+             }
+         };
+
+        // --- Funções Firebase ---
+        function getFirestoreCollection(collectionName) {
+             if (!userId || !db) { console.warn(`Firestore indisponível [${collectionName}]`); return null; }
+             return collection(db, `users/${userId}/${collectionName}`);
+        }
+        function getFirestoreDoc(collectionName, docId) {
+             const collRef = getFirestoreCollection(collectionName);
+             if (!collRef || !docId) return null;
+             return doc(collRef, docId);
+        }
+        function getSettingsDocRef() {
+            if (!userId || !db) return null;
+            return doc(db, `users/${userId}/config/appSettings`);
+        }
+        async function saveSettings(settingsData) {
+            const docRef = getSettingsDocRef();
+            if (!docRef) return;
+            try {
+                await setDoc(docRef, settingsData, { merge: true });
+                console.log("Settings saved:", settingsData);
+                if (settingsData.startingAddress !== undefined) startingAddress = settingsData.startingAddress;
+            } catch (error) { console.error("Error saving settings:", error); }
+        }
+        async function loadSettings() {
+             const docRef = getSettingsDocRef();
+             if (!docRef) return;
+             try {
+                const docSnap = await getDoc(docRef);
+                const addressInput = document.getElementById('start-address');
+                if (docSnap.exists()) {
+                    const settings = docSnap.data();
+                    startingAddress = settings.startingAddress || '';
+                    if (addressInput) addressInput.value = startingAddress;
+                } else {
+                    startingAddress = '';
+                    if (addressInput) addressInput.value = '';
+                }
+             } catch (error) { console.error("Error loading settings:", error); startingAddress=''; const el = document.getElementById('start-address'); if(el) el.value=''; }
+        }
+        window.addDelivery = function() {
+             const collRef = getFirestoreCollection('deliveries');
+             const cepErrorEl = document.getElementById('cep-error');
+             if (!collRef) { if(cepErrorEl){ cepErrorEl.textContent="Erro DB"; cepErrorEl.style.display='block';} return; }
+             const addressInput = document.getElementById('address');
+             const neighborhoodInput = document.getElementById('neighborhood');
+             const sizeInput = document.querySelector('input[name="size"]:checked');
+             const cepInput = document.getElementById('cep');
+             const address = addressInput.value.trim();
+             const neighborhood = neighborhoodInput.value.trim();
+             const size = sizeInput ? sizeInput.value : 'Pequeno';
+             const cep = cepInput.value.replace(/\D/g, '');
+             if (!address || !neighborhood) { if(cepErrorEl){ cepErrorEl.textContent="Endereço e Bairro obrigatórios"; cepErrorEl.style.display='block';} return; }
+             const newDelivery = { address, neighborhood, size, cep: cep || null, createdAt: Timestamp.now(), status: 'pending' };
+
+             addDoc(collRef, newDelivery)
+                .then(() => {
+                    addressInput.value = ''; neighborhoodInput.value = ''; cepInput.value = '';
+                    if(cepErrorEl) cepErrorEl.style.display='none';
+                    document.querySelector('input[name="size"][value="Pequeno"]').checked = true;
+                })
+                .catch(error => { console.error("Erro ao adicionar:", error); if(cepErrorEl){ cepErrorEl.textContent=`Erro: ${error.message}`; cepErrorEl.style.display='block';} });
+        }
+        function loadDeliveries() {
+            const collRef = getFirestoreCollection('deliveries');
+            if (!collRef) { renderRouteList([], true, {}); renderManagementList([]); return; }
+            if (deliveriesUnsubscribe) deliveriesUnsubscribe();
+            const q = query(collRef, orderBy("createdAt", "desc"));
+            deliveriesUnsubscribe = onSnapshot(q, (querySnapshot) => {
+                currentDeliveries = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (currentView === 'management-view') { renderManagementList(currentDeliveries); }
+                else { optimizeAndRenderRoutes(currentDeliveries, true); }
+            }, (error) => { console.error("Erro loadDeliveries:", error); renderRouteList([], true, {}); renderManagementList([]); });
+        }
+        window.toggleDeliveryStatus = async (deliveryId, currentStatus) => {
+            const docRef = getFirestoreDoc('deliveries', deliveryId); if (!docRef) return;
+             let newStatus = (currentStatus === 'pending') ? 'delivered' : (currentStatus === 'delivered' ? 'not_home' : 'pending');
+            try { await updateDoc(docRef, { status: newStatus }); }
+            catch (error) { console.error("Erro toggleStatus:", error); }
+        };
+        window.deleteDelivery = function(deliveryId) {
+             const docRef = getFirestoreDoc('deliveries', deliveryId); if (!docRef) return;
+             // Lógica de confirmação já está em handleConfirmDelete
+             deleteDoc(docRef).then(() => console.log("Excluído:", deliveryId)).catch(error => console.error("Erro ao excluir:", error));
+        };
+
+        // --- Otimização e Rota ---
+        window.runOptimization = async function(isInitialLoad = false) {
+             const routeStatus = document.getElementById('route-status');
+             const optimizeButton = document.getElementById('update-route-button');
+             const startAddressInput = document.getElementById('start-address');
+             const currentAddressValue = startAddressInput ? startAddressInput.value.trim() : '';
+
+             if (currentAddressValue && currentAddressValue !== startingAddress) {
+                 startingAddress = currentAddressValue;
+                 await saveSettings({ startingAddress: startingAddress });
+             } else if (!startingAddress && currentAddressValue) {
+                  startingAddress = currentAddressValue;
+                  await saveSettings({ startingAddress: startingAddress });
+             }
+
+             if (!isInitialLoad) {
+                 console.log("Iniciando otimização manual...");
+                 if (routeStatus) { routeStatus.textContent = "Otimizando rota..."; routeStatus.style.display = 'block'; }
+                 if (optimizeButton) optimizeButton.disabled = true;
+             }
+             await optimizeAndRenderRoutes(currentDeliveries, isInitialLoad, startingAddress); // Passa o endereço atualizado
+             if (!isInitialLoad && optimizeButton) {
+                 optimizeButton.disabled = false;
+             }
+         }
+        async function optimizeAndRenderRoutes(allDeliveries, isInitialLoad = false, currentStartAddress = null) {
+             const routeStatus = document.getElementById('route-status');
+             const startAddr = currentStartAddress !== null ? currentStartAddress : startingAddress; // Usa o mais recente
+             const deliveriesToOptimize = allDeliveries.filter(d => d.status === 'pending' || d.status === 'not_home'); // Otimiza pendentes e não estava
+             const failedDeliveries = {};
+
+             console.log(`optimizeAndRenderRoutes chamado. isInitialLoad: ${isInitialLoad}, startAddr: ${startAddr}, deliveriesToOptimize: ${deliveriesToOptimize.length}`);
+
+             if (!startAddr && deliveriesToOptimize.length > 0) {
+                 console.warn("Endereço de partida não definido. Usando ordenação básica.");
+                 if (routeStatus && !isInitialLoad) routeStatus.textContent = "Ordenação básica (Defina um endereço de partida).";
+                 const basicSorted = basicSortDeliveries(allDeliveries); // Ordena TODOS para fallback
+                 renderRouteList(basicSorted, true, {});
+                 return;
+             } else if (deliveriesToOptimize.length === 0) {
+                  console.log("Nenhuma entrega pendente/não em casa para otimizar.");
+                  // Mostra lista vazia ou só entregues na ordem básica? Vamos mostrar vazia na rota.
+                  renderRouteList([], true, {}); // Mostra lista vazia na aba Rota
+                  if (routeStatus) routeStatus.style.display = 'none';
+                  return;
+             }
+
+             if (!isInitialLoad && routeStatus) {
+                 routeStatus.textContent = "Buscando coordenadas...";
+                 routeStatus.style.display = 'block';
+             }
+
+             try {
+                // ... (API Key e lógica de geocodificação igual, mas itera em deliveriesToOptimize + startAddr) ...
+                const apiKey = "5b3ce3597851110001cf624852da619a1e2f42b7984cc26314de2636"; // COLE SUA CHAVE AQUI
+                if (apiKey === "COLE_SUA_CHAVE_GRATUITA_AQUI") throw new Error("API Key não configurada.");
+
+                const locations = [startAddr, ...deliveriesToOptimize.map(d => d.address)];
+                const coordinates = [];
+                const geoCache = new Map();
+                const addressToDeliveryMap = new Map(deliveriesToOptimize.map((d, i) => [d.address + i, d])); // Mapeia endereço (+index) para entrega
+
+                for (let i = 0; i < locations.length; i++) {
+                     const address = locations[i];
+                     const isStart = i === 0;
+                     const delivery = isStart ? null : deliveriesToOptimize[i - 1]; // Entrega correspondente
+                     const cacheKey = address + (delivery ? delivery.id : 'start'); // Chave única para cache
+
+                     if (geoCache.has(cacheKey)) {
+                         coordinates.push(geoCache.get(cacheKey));
+                         continue;
+                     }
+                     if (!isInitialLoad && routeStatus) routeStatus.textContent = `Buscando coord. (${i + 1}/${locations.length})...`;
+                     await new Promise(resolve => setTimeout(resolve, 1500)); // Delay
+
+                     try {
+                         const geoResponse = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${apiKey}&text=${encodeURIComponent(address)}`);
+                         if (!geoResponse.ok) throw new Error(`Status ${geoResponse.status}`);
+                         const geoData = await geoResponse.json();
+                         if (!geoData.features || geoData.features.length === 0) throw new Error(`Não encontrado`);
+
+                         const coord = geoData.features[0].geometry.coordinates; // [lon, lat]
+                         geoCache.set(cacheKey, coord);
+                         coordinates.push(coord);
+                     } catch (geoError) {
+                         console.error(`Falha ao geocodificar "${address}":`, geoError.message);
+                         if (delivery) { // Se falhou para uma entrega, marca como falha
+                            failedDeliveries[delivery.id] = {...delivery, error: geoError.message};
+                         } else { // Se falhou para o endereço de partida
+                             throw new Error(`Falha ao encontrar coordenadas do endereço de partida "${startAddr}". Verifique o endereço.`);
+                         }
+                         coordinates.push(null); // Adiciona null para manter a contagem de índices
+                     }
+                }
+                console.log("Coordenadas obtidas (pode conter nulls):", coordinates);
+
+                // Filtra entregas que falharam na geocodificação
+                const validDeliveriesWithCoords = deliveriesToOptimize
+                    .map((delivery, index) => ({
+                         ...delivery,
+                         coords: coordinates[index + 1] ? { latitude: coordinates[index + 1][1], longitude: coordinates[index + 1][0] } : null
+                    }))
+                    .filter(d => d.coords !== null); // Apenas as que têm coordenadas
+
+                 if (validDeliveriesWithCoords.length === 0 && Object.keys(failedDeliveries).length > 0) {
+                     // Se TODAS falharam, só renderiza as falhas
+                     renderRouteList([], true, failedDeliveries); // Usa modo básico para mostrar falhas
+                     if (routeStatus && !isInitialLoad) routeStatus.textContent = "Nenhuma entrega pôde ser localizada.";
+                     return;
+                 } else if (validDeliveriesWithCoords.length === 0) {
+                     // Se não há falhas E não há válidas (lista vazia inicial?), renderiza vazio
+                     renderRouteList([], true, {});
+                     if (routeStatus) routeStatus.style.display = 'none';
+                     return;
+                 }
+
+
+                 // Otimização (Vizinho Mais Próximo) SOMENTE com as coordenadas válidas
+                 if (!isInitialLoad && routeStatus) routeStatus.textContent = `Calculando rota para ${validDeliveriesWithCoords.length} entregas...`;
+                 let currentCoords = { latitude: coordinates[0][1], longitude: coordinates[0][0] }; // Ponto de partida
+                 let remainingValidDeliveries = [...validDeliveriesWithCoords];
+                 let optimizedRoute = [];
+
+                 while (remainingValidDeliveries.length > 0) {
+                    let closestDistance = Infinity;
+                    let closestIndex = -1;
+                    remainingValidDeliveries.forEach((delivery, index) => {
+                        const distance = getHaversineDistance(currentCoords, delivery.coords);
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            closestIndex = index;
+                        }
+                    });
+                    const closestDelivery = remainingValidDeliveries.splice(closestIndex, 1)[0];
+                    closestDelivery.distanceFromPrevious = closestDistance;
+                    optimizedRoute.push(closestDelivery);
+                    currentCoords = closestDelivery.coords;
+                 }
+
+                 console.log("Rota otimizada:", optimizedRoute);
+                 console.log("Entregas com falha na geocodificação:", failedDeliveries);
+                 if (routeStatus && !isInitialLoad) {
+                     let statusMsg = `Rota otimizada para ${optimizedRoute.length} entregas!`;
+                     if (Object.keys(failedDeliveries).length > 0) {
+                         statusMsg += ` (${Object.keys(failedDeliveries).length} não localizadas).`;
+                     }
+                     routeStatus.textContent = statusMsg;
+                 } else if (routeStatus) {
+                     routeStatus.style.display = 'none'; // Esconde status no load inicial
+                 }
+                 renderRouteList(optimizedRoute, false, failedDeliveries); // Renderiza otimizada + falhas
+
+             } catch (error) {
+                 console.error("Erro durante otimização/geocodificação:", error);
+                 if (routeStatus && !isInitialLoad) routeStatus.textContent = `Erro: ${error.message}. Usando ordenação básica.`;
+                 const basicSorted = basicSortDeliveries(allDeliveries); // Fallback: ordena TODOS
+                 renderRouteList(basicSorted, true, failedDeliveries); // Mostra falhas mesmo no fallback
+             }
+        }
+
+
+        // --- Busca CEP ---
+        // (Funções fetchAddressByCEP, fetchBaseAddressByCEP, searchCEPsByAddress revisadas)
+
+        // Busca CEP para Nova Entrega
+        window.fetchAddressByCEP = async function() {
+            const cepInput = document.getElementById('cep');
+            const cep = cepInput ? cepInput.value.replace(/\D/g, '') : '';
+            const addressInput = document.getElementById('address');
+            const neighborhoodInput = document.getElementById('neighborhood');
+            const errorElement = document.getElementById('cep-error');
+            const lookupButton = document.getElementById('cep-lookup-button');
+
+            if (errorElement) errorElement.style.display = 'none';
+            if (!cepInput || !addressInput || !neighborhoodInput || !errorElement || !lookupButton) {
+                console.error("Elementos do formulário de CEP não encontrados.");
+                return;
+            }
+
+            if (cep.length !== 8) {
+                errorElement.textContent = "CEP inválido. Deve conter 8 dígitos.";
+                errorElement.style.display = 'block';
+                return;
+            }
+
+            lookupButton.disabled = true;
+            lookupButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Buscando...`;
+
+            try {
+                console.log(`Buscando CEP: ${cep}`);
+                const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                if (!response.ok) {
+                    throw new Error(`Erro na API ViaCEP: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log("Resposta ViaCEP:", data);
+
+                if (data.erro) {
+                    errorElement.textContent = "CEP não encontrado.";
+                    errorElement.style.display = 'block';
+                } else {
+                    let street = data.logradouro || '';
+                    let city = data.localidade || '';
+                    let state = data.uf || '';
+                    let bairro = data.bairro || '';
+                    // Monta endereço, focando no número se não houver rua
+                    let fullAddress = street || '';
+                    if (fullAddress) fullAddress += ', [NÚMERO]'; // Placeholder para número
+                    if (bairro) fullAddress += `${fullAddress ? ', ' : ''}${bairro}`;
+                    if (city) fullAddress += `${fullAddress ? ', ' : ''}${city}`;
+                    if (state) fullAddress += `${fullAddress ? ' - ' : ''}${state}`;
+
+                    addressInput.value = fullAddress.trim();
+                    neighborhoodInput.value = bairro;
+                }
+            } catch (error) {
+                console.error("Erro ao buscar CEP:", error);
+                errorElement.textContent = `Erro: ${error.message}. Verifique a conexão.`;
+                errorElement.style.display = 'block';
+            } finally {
+                lookupButton.disabled = false;
+                lookupButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar`;
+            }
+        }
+
+        // Busca CEP para Endereço Base
+        window.fetchBaseAddressByCEP = async function() {
+            const cepInput = document.getElementById('start-cep');
+            const cep = cepInput ? cepInput.value.replace(/\D/g, '') : '';
+            const addressInput = document.getElementById('start-address');
+            const errorElement = document.getElementById('start-cep-error');
+            const lookupButton = document.getElementById('start-cep-lookup-button');
+
+            if (errorElement) errorElement.style.display = 'none';
+             if (!cepInput || !addressInput || !errorElement || !lookupButton) {
+                console.error("Elementos do formulário de CEP Base não encontrados.");
+                return;
+            }
+
+            if (cep.length !== 8) {
+                errorElement.textContent = "CEP inválido. Deve conter 8 dígitos.";
+                errorElement.style.display = 'block';
+                return;
+            }
+
+            lookupButton.disabled = true;
+            lookupButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Buscando...`;
+
+
+            try {
+                console.log(`Buscando CEP Base: ${cep}`);
+                const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                if (!response.ok) {
+                    throw new Error(`Erro na API ViaCEP: ${response.status}`);
+                }
+                const data = await response.json();
+                 console.log("Resposta ViaCEP (Base):", data);
+
+                if (data.erro) {
+                    errorElement.textContent = "CEP não encontrado.";
+                    errorElement.style.display = 'block';
+                } else {
+                    let fullAddress = `${data.logradouro || ''}, [NÚMERO], ${data.bairro || ''}, ${data.localidade || ''} - ${data.uf || ''}`;
+                    addressInput.value = fullAddress.replace(', ,',',').replace(' ,','').trim(); // Limpa vírgulas extras
+                    // Salva automaticamente o endereço encontrado
+                    await saveSettings({ startingAddress: addressInput.value });
+                }
+            } catch (error) {
+                console.error("Erro ao buscar CEP da base:", error);
+                errorElement.textContent = `Erro: ${error.message}. Verifique a conexão.`;
+                errorElement.style.display = 'block';
+            } finally {
+                lookupButton.disabled = false;
+                lookupButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar`;
+            }
+        }
+
+        // Busca CEPs por Endereço
+        window.searchCEPsByAddress = async function() {
+            const ufInput = document.getElementById('search-uf');
+            const cityInput = document.getElementById('search-city');
+            const streetInput = document.getElementById('search-street');
+            const resultsDiv = document.getElementById('cep-results');
+            const searchButton = document.getElementById('search-cep-button');
+
+             if (!ufInput || !cityInput || !streetInput || !resultsDiv || !searchButton) {
+                 console.error("Elementos da busca por endereço não encontrados.");
+                 return;
+             }
+
+            const uf = ufInput.value.trim().toUpperCase();
+            const city = cityInput.value.trim();
+            const street = streetInput.value.trim();
+
+            resultsDiv.innerHTML = '<p class="text-slate-500">Buscando...</p>';
+            resultsDiv.style.display = 'block';
+            searchButton.disabled = true;
+            searchButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Buscando...`;
+
+
+            // Validações
+            if (uf.length !== 2 || !/^[A-Z]+$/.test(uf)) {
+                 resultsDiv.innerHTML = '<p class="text-red-500">UF inválida (Ex: MG).</p>';
+                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
+            }
+            if (city.length < 3) {
+                 resultsDiv.innerHTML = '<p class="text-red-500">Cidade inválida.</p>';
+                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
+            }
+             if (street.length < 3) {
+                 resultsDiv.innerHTML = '<p class="text-red-500">Logradouro inválido (mínimo 3 caracteres).</p>';
+                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
+            }
+
+            try {
+                // Usa encodeURIComponent para garantir que espaços e caracteres especiais funcionem
+                const apiUrl = `https://viacep.com.br/ws/${encodeURIComponent(uf)}/${encodeURIComponent(city)}/${encodeURIComponent(street)}/json/`;
+                console.log("Buscando CEPs por endereço:", apiUrl);
+
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                     throw new Error(`Erro na API ViaCEP: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log("Resposta ViaCEP (busca endereço):", data);
+
+                // Verifica se a resposta é um array (múltiplos resultados)
+                if (Array.isArray(data)) {
+                    if (data.length === 0) {
+                        resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado para este endereço.</p>';
+                    } else {
+                        // Mapeia cada resultado no array para um parágrafo HTML
+                         resultsDiv.innerHTML = data.map(result =>
+                            `<p><strong>CEP:</strong> ${result.cep || 'N/D'}<br>
+                             ${result.logradouro || ''}${result.complemento ? ' - ' + result.complemento : ''}<br>
+                             ${result.bairro || ''} - ${result.localidade || ''}/${result.uf || ''}</p>`
+                        ).join('');
+                    }
+                } else if (data.erro) { // Verifica se a API retornou erro explícito (acontece em alguns casos)
+                     resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado para este endereço.</p>';
+                } else if (data.cep) { // Caso retorne um objeto único (raro para busca por rua, mas possível)
+                     resultsDiv.innerHTML = `<p><strong>CEP:</strong> ${data.cep || 'N/D'}<br>
+                                            ${data.logradouro || ''}${data.complemento ? ' - ' + data.complemento : ''}<br>
+                                            ${data.bairro || ''} - ${data.localidade || ''}/${data.uf || ''}</p>`;
+                }
+                else { // Resposta inesperada
+                     resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado ou resposta inesperada.</p>';
+                }
+
+            } catch (error) {
+                console.error("Erro ao buscar CEP por endereço:", error);
+                resultsDiv.innerHTML = `<p class="text-red-500">Erro: ${error.message}. Verifique os dados ou a conexão.</p>`;
+            } finally {
+                searchButton.disabled = false;
+                 searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`;
+            }
+        }
+
+
+        // --- Helpers e Funções Restantes ---
         // (Código restante igual ao anterior)
-        window.runOptimization = async function(isInitialLoad = false) { /* ... */ }
-        async function optimizeAndRenderRoutes(allDeliveries, isInitialLoad = false, currentStartAddress = null) { /* ... */ }
-        window.fetchAddressByCEP = async function() { /* ... */ }
-        window.searchCEPsByAddress = async function() { /* ... */ }
-        window.fetchBaseAddressByCEP = async function() { /* ... */ }
         function getHaversineDistance(coords1, coords2) { /* ... */ }
         function basicSortDeliveries(deliveries) { /* ... */ }
         function renderRouteList(deliveries, isBasicSort, failedDeliveries) { /* ... */ }
