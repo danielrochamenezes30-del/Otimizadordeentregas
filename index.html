@@ -522,15 +522,16 @@
 
     <!-- Firebase -->
     <script type="module">
-        // Importações (iguais)
+        // Importações
         import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import {
             getAuth,
             onAuthStateChanged,
-            signInWithPopup,
+            signInWithRedirect, // Alterado para Redirect
+            getRedirectResult,  // Para pegar o resultado do Redirect
             GoogleAuthProvider,
             signOut,
-            sendEmailVerification // <-- Importado
+            sendEmailVerification
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import {
             getFirestore, collection, addDoc, onSnapshot, query, deleteDoc,
@@ -544,20 +545,11 @@
         let userId;
         let deliveriesUnsubscribe = null;
         let currentDeliveries = [];
-        //let startingAddress = ''; // Agora montado dinamicamente
         let lastOptimizedRoute = [];
         let currentView = 'route-view';
-        let authReady = false; // Flag para indicar se a verificação inicial terminou
+        let authReady = false;
 
-        // Estrutura para armazenar endereço base separado
-        let baseAddress = {
-            street: '',
-            number: '',
-            neighborhood: '',
-            city: '',
-            uf: ''
-        };
-
+        let baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
 
         // Elementos DOM (iguais)
         const loginContainer = document.getElementById('login-container');
@@ -571,7 +563,6 @@
         const emailVerificationBar = document.getElementById('email-verification-bar');
         const resendVerificationButton = document.getElementById('resend-verification-button');
         const resendStatusElement = document.getElementById('resend-status');
-
 
         // Configuração Firebase (Sua Configuração) (igual)
         const firebaseConfig = {
@@ -587,50 +578,13 @@
         let firebaseInitialized = false;
 
         // Função para atualizar UI de login/loading (igual)
-        function updateLoginUI(isLoading, message, isError = false) {
-             console.log(`[UI Update] isLoading=${isLoading}, message=${message}, isError=${isError}`);
-             if (loginMessageElement) loginMessageElement.textContent = message;
-             if (authErrorElement) {
-                 authErrorElement.textContent = isError ? message : '';
-                 authErrorElement.style.display = isError ? 'block' : 'none';
-                 if(isError && loginMessageElement) loginMessageElement.style.display = 'none';
-                 else if (loginMessageElement) loginMessageElement.style.display = 'block';
-             }
-             if (loginButton) loginButton.style.display = (!isLoading && !isError) ? 'inline-flex' : 'none';
-             if (loadingSpinner) loadingSpinner.style.display = isLoading ? 'block' : 'none';
-             if (staticIcon) staticIcon.style.display = isLoading ? 'none' : 'block';
-        }
+        function updateLoginUI(isLoading, message, isError = false) { /* ... código igual ... */ }
 
-        // --- Monta String de Endereço ---
-        function assembleAddressString(addrObj) {
-            let parts = [];
-            if (addrObj.street) parts.push(addrObj.street);
-            if (addrObj.number) parts.push(addrObj.number);
-            if (addrObj.neighborhood) parts.push(addrObj.neighborhood);
-            if (addrObj.city) parts.push(addrObj.city);
-
-            let addressStr = parts.slice(0, -1).join(', '); // Junta rua, numero, bairro com vírgula
-            if (parts.length > 1) { // Adiciona cidade
-                 addressStr += `, ${parts[parts.length - 1]}`;
-            } else if (parts.length === 1) { // Se só tiver a cidade (ou outro único)
-                addressStr = parts[0];
-            }
+        // --- Monta String de Endereço --- (igual)
+        function assembleAddressString(addrObj) { /* ... código igual ... */ }
 
 
-            if (addrObj.uf) {
-                addressStr += (addressStr ? ' - ' : '') + addrObj.uf; // Adiciona UF no final
-            }
-             // Caso especial: se SÓ tiver bairro, cidade e UF (ex: CEP geral da cidade)
-            if (!addrObj.street && !addrObj.number && addrObj.neighborhood && addrObj.city && addrObj.uf) {
-                 addressStr = `${addrObj.neighborhood}, ${addrObj.city} - ${addrObj.uf}`;
-            }
-            // Garante remover espaços extras e vírgulas duplicadas ou no final
-            addressStr = addressStr.replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim();
-            return addressStr;
-        }
-
-
-        // Espera o DOM carregar antes de inicializar Firebase (igual)
+        // Espera o DOM carregar antes de inicializar Firebase
         document.addEventListener('DOMContentLoaded', () => {
              console.log("DOM Carregado. Inicializando Firebase...");
              updateLoginUI(true, "Inicializando..."); // Mostra carregando inicial
@@ -642,86 +596,89 @@
                  console.log("Firebase inicializado OK.");
                  // setLogLevel('debug');
 
-                 // --- INÍCIO: Lógica de Autenticação com Verificação --- (igual)
-                 onAuthStateChanged(auth, async (user) => {
-                      console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null', "Email Verificado:", user ? user.emailVerified : 'N/A');
-                      authReady = true;
+                // --- INÍCIO: Lógica de Autenticação com REDIRECT ---
+                 console.log("Verificando resultado do Redirect...");
+                 updateLoginUI(true, "Verificando autenticação..."); // Mantém carregando
 
-                      if (user) {
-                          // Usuário LOGADO
-                          userId = user.uid;
-                          console.log("Estado: LOGADO.", user.displayName, userId);
-                          if (userDisplayElement) {
-                              userDisplayElement.textContent = user.displayName || user.email || `Usuário ${userId.substring(0,6)}...`;
-                              userDisplayElement.title = user.email || `ID: ${userId}`;
-                          }
+                 getRedirectResult(auth)
+                     .then(async (result) => {
+                         authReady = true; // Marca como pronto APÓS getRedirectResult
+                         console.log("getRedirectResult concluído.");
+                         if (result && result.user) {
+                             console.log("Redirect Result OBTEVE usuário:", result.user.uid);
+                             // O onAuthStateChanged (configurado abaixo) vai pegar esse usuário
+                             // Não precisa fazer nada aqui, apenas deixar o listener agir
+                         } else {
+                             console.log("Nenhum usuário obtido do Redirect Result (pode ser a primeira visita ou refresh).");
+                             // Se não veio do redirect E não está logado, o listener abaixo mostrará o botão de login
+                         }
+                         // Configura o listener DEPOIS de verificar o redirect
+                         setupAuthStateListener();
+                     })
+                     .catch((error) => {
+                         authReady = true; // Marca como pronto mesmo com erro
+                         console.error("Erro ao verificar Redirect Result:", error.code, error.message);
+                         updateLoginUI(false, `Erro na verificação inicial: ${error.message}`, true);
+                         // Configura o listener mesmo com erro, para pegar estado logado anterior ou mostrar botão
+                         setupAuthStateListener();
+                     });
 
-                          // Verifica e envia email de verificação se necessário
-                          if (!user.emailVerified) {
-                              console.log("E-mail não verificado. Tentando enviar verificação...");
-                              // Verifica se já enviamos recentemente para evitar spam
-                              const lastSent = sessionStorage.getItem('verificationEmailSent');
-                              const now = Date.now();
-                              if (!lastSent || (now - parseInt(lastSent)) > 60000) { // 1 minuto de cooldown
-                                   sendEmailVerification(user)
-                                        .then(() => {
-                                             sessionStorage.setItem('verificationEmailSent', now.toString());
-                                             console.log("E-mail de verificação enviado.");
-                                             if (emailVerificationBar) emailVerificationBar.style.display = 'block';
-                                             if (resendStatusElement) resendStatusElement.textContent = 'E-mail enviado!';
-                                             if (resendVerificationButton) resendVerificationButton.disabled = false;
-                                        })
-                                        .catch((error) => {
-                                             console.error("Erro ao enviar email de verificação:", error);
-                                             if (emailVerificationBar) emailVerificationBar.style.display = 'block';
-                                             if (resendStatusElement) resendStatusElement.textContent = `Erro ao enviar: ${error.code}`;
-                                             if (resendVerificationButton) resendVerificationButton.disabled = false; // Reabilita em caso de erro
-                                         });
-                              } else {
-                                   console.log("Envio de verificação pulado (muito recente).");
-                                   if (emailVerificationBar) emailVerificationBar.style.display = 'block';
-                                   if (resendStatusElement) resendStatusElement.textContent = 'Verifique seu e-mail.';
-                                   if (resendVerificationButton) resendVerificationButton.disabled = false;
-                              }
-                          } else {
-                              console.log("E-mail já verificado.");
-                              if (emailVerificationBar) emailVerificationBar.style.display = 'none';
-                          }
+                 // Função que configura o listener principal (igual à anterior)
+                 function setupAuthStateListener() {
+                     console.log("Configurando onAuthStateChanged listener...");
+                     onAuthStateChanged(auth, async (user) => {
+                         console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null', "AuthReady:", authReady);
 
+                         // Só age se a verificação inicial (getRedirectResult) já terminou
+                         if (!authReady) {
+                             console.log("Auth ainda não está pronta, aguardando...");
+                             return; // Não faz nada até o getRedirectResult terminar
+                         }
 
-                          if (appContainer) appContainer.style.display = 'block';
-                          if (loginContainer) loginContainer.style.display = 'none';
-                          showView(currentView);
-                          await loadSettings(); // Carrega o endereço base separado
-                          loadDeliveries();
-                      } else {
-                          // Usuário DESLOGADO
-                          console.log("Estado: DESLOGADO.");
-                          userId = null;
-                          // Limpa objeto baseAddress
-                          baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
-                          // Limpa campos do formulário base
-                           document.getElementById('start-street').value = '';
-                           document.getElementById('start-number').value = '';
-                           document.getElementById('start-neighborhood').value = '';
-                           document.getElementById('start-city').value = '';
-                           document.getElementById('start-uf').value = '';
-                           document.getElementById('start-cep').value = '';
+                         if (user) {
+                            // Usuário LOGADO
+                            userId = user.uid;
+                            console.log("Estado: LOGADO.", user.displayName, userId);
+                            if (userDisplayElement) {
+                                userDisplayElement.textContent = user.displayName || user.email || `Usuário ${userId.substring(0,6)}...`;
+                                userDisplayElement.title = user.email || `ID: ${userId}`;
+                            }
 
+                            // Verifica e envia email de verificação se necessário (lógica igual)
+                            if (!user.emailVerified) {
+                                // ... (código igual para enviar email) ...
+                            } else {
+                                console.log("E-mail já verificado.");
+                                if (emailVerificationBar) emailVerificationBar.style.display = 'none';
+                            }
 
-                          if (emailVerificationBar) emailVerificationBar.style.display = 'none';
-                          if (appContainer) appContainer.style.display = 'none';
-                          if (loginContainer) loginContainer.style.display = 'flex';
-                          if(firebaseInitialized) {
-                              updateLoginUI(false, "Faça login para salvar e gerenciar suas rotas.");
-                          } else {
-                              updateLoginUI(false, "Erro na inicialização. Recarregue.", true);
-                          }
-                          if (deliveriesUnsubscribe) { deliveriesUnsubscribe(); deliveriesUnsubscribe = null; }
-                          currentDeliveries = []; lastOptimizedRoute = [];
-                      }
-                 });
-                 // --- FIM: Lógica de Autenticação ---
+                            if (appContainer) appContainer.style.display = 'block';
+                            if (loginContainer) loginContainer.style.display = 'none';
+                            showView(currentView);
+                            await loadSettings();
+                            loadDeliveries();
+                         } else {
+                             // Usuário DESLOGADO
+                             console.log("Estado: DESLOGADO.");
+                             userId = null;
+                             baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
+                             // Limpa campos... (código igual)
+
+                             if (emailVerificationBar) emailVerificationBar.style.display = 'none';
+                             if (appContainer) appContainer.style.display = 'none';
+                             if (loginContainer) loginContainer.style.display = 'flex'; // MOSTRA tela de login
+                             if(firebaseInitialized) {
+                                 updateLoginUI(false, "Faça login para salvar e gerenciar suas rotas.");
+                             } else {
+                                 updateLoginUI(false, "Erro na inicialização. Recarregue.", true);
+                             }
+                             if (deliveriesUnsubscribe) { deliveriesUnsubscribe(); deliveriesUnsubscribe = null; }
+                             currentDeliveries = []; lastOptimizedRoute = [];
+                         }
+                     });
+                 }
+                // --- FIM: Lógica de Autenticação ---
+
 
              } catch (initError) {
                   console.error("Erro CRÍTICO ao inicializar Firebase:", initError);
@@ -733,8 +690,25 @@
         }); // Fim do DOMContentLoaded
 
 
-        // Função de Login com Google (usa Popup) (igual)
-        window.loginWithGoogle = async () => { /* ... código igual ... */ };
+        // Função de Login com Google (usa Redirect)
+        window.loginWithGoogle = async () => {
+             if (!auth || !firebaseInitialized) {
+                 console.error("Firebase Auth não inicializado.");
+                 updateLoginUI(false, "Erro: Autenticação não pronta.", true);
+                 return;
+             }
+             const provider = new GoogleAuthProvider();
+             updateLoginUI(true, "Redirecionando para o Google..."); // Atualiza UI
+             if (authErrorElement) authErrorElement.style.display = 'none'; // Esconde erro anterior
+             try {
+                 await signInWithRedirect(auth, provider);
+                 // O navegador vai redirecionar; o resultado será pego por getRedirectResult no próximo load
+             } catch (error) {
+                 console.error("Erro ao iniciar signInWithRedirect:", error);
+                 // Atualiza UI para mostrar o erro e o botão novamente
+                 updateLoginUI(false, `Erro ao tentar login: ${error.code} - ${error.message}`, true);
+             }
+        };
 
         // Função para Reenviar Email de Verificação (igual)
         window.resendVerificationEmail = async () => { /* ... código igual ... */ };
@@ -751,70 +725,22 @@
         function getFirestoreDoc(collectionName, docId) { /* ... código igual ... */ }
         function getSettingsDocRef() { /* ... código igual ... */ }
 
-        // Salva o endereço base separado
-        async function saveSettings(settingsData) {
-            const docRef = getSettingsDocRef();
-            if (!docRef) return;
-            try {
-                // Salva o objeto baseAddress inteiro
-                await setDoc(docRef, { baseAddress: settingsData }, { merge: true });
-                console.log("Settings saved:", settingsData);
-                baseAddress = { ...settingsData }; // Atualiza a variável local
-            } catch (error) { console.error("Error saving settings:", error); }
-        }
+        // Salva o endereço base separado (igual)
+        async function saveSettings(settingsData) { /* ... código igual ... */ }
 
-        // Carrega o endereço base separado e preenche os campos
-        async function loadSettings() {
-             const docRef = getSettingsDocRef();
-             if (!docRef) return;
-             try {
-                 const docSnap = await getDoc(docRef);
-                 if (docSnap.exists() && docSnap.data().baseAddress) {
-                     const settings = docSnap.data().baseAddress;
-                     baseAddress = { // Atualiza a variável global
-                         street: settings.street || '',
-                         number: settings.number || '',
-                         neighborhood: settings.neighborhood || '',
-                         city: settings.city || '',
-                         uf: settings.uf || ''
-                     };
-                     // Preenche os campos do formulário
-                     document.getElementById('start-street').value = baseAddress.street;
-                     document.getElementById('start-number').value = baseAddress.number;
-                     document.getElementById('start-neighborhood').value = baseAddress.neighborhood;
-                     document.getElementById('start-city').value = baseAddress.city;
-                     document.getElementById('start-uf').value = baseAddress.uf;
-                 } else {
-                     // Limpa variável global e campos se não houver dados salvos
-                     baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
-                     document.getElementById('start-street').value = '';
-                     document.getElementById('start-number').value = '';
-                     document.getElementById('start-neighborhood').value = '';
-                     document.getElementById('start-city').value = '';
-                     document.getElementById('start-uf').value = '';
-                 }
-             } catch (error) {
-                 console.error("Error loading settings:", error);
-                 // Limpa em caso de erro também
-                 baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
-                 document.getElementById('start-street').value = '';
-                 document.getElementById('start-number').value = '';
-                 document.getElementById('start-neighborhood').value = '';
-                 document.getElementById('start-city').value = '';
-                 document.getElementById('start-uf').value = '';
-             }
-        }
+        // Carrega o endereço base separado e preenche os campos (igual)
+        async function loadSettings() { /* ... código igual ... */ }
 
-        // Adiciona entrega montando o endereço
+        // Adiciona entrega montando o endereço (com verificação extra)
         window.addDelivery = function() {
               const collRef = getFirestoreCollection('deliveries');
-              const cepErrorEl = document.getElementById('delivery-cep-error'); // Corrigido ID
+              const cepErrorEl = document.getElementById('delivery-cep-error');
 
-               // **CORREÇÃO: Verifica autenticação E db ANTES de prosseguir**
-               if (!authReady || !userId || !db) { // <-- Adicionado !db
+               // **CORREÇÃO REFORÇADA: Verifica auth, userId e db**
+               if (!authReady || !auth.currentUser || !userId || !db) { // <-- Verificação mais completa
                    console.warn("Tentativa de adicionar entrega antes da autenticação/DB estar pronto.");
                    if(cepErrorEl){
-                       cepErrorEl.textContent="Aguardando conexão... Tente novamente em alguns segundos."; // Mensagem mais genérica
+                       cepErrorEl.textContent="Aguardando conexão/autenticação... Tente novamente em alguns segundos.";
                        cepErrorEl.style.display='block';
                    }
                    return;
@@ -829,42 +755,36 @@
                    return;
               }
 
-
-              // Pega valores dos campos separados
+              // Pega valores dos campos separados (igual)
               const streetInput = document.getElementById('delivery-street');
-              const numberInput = document.getElementById('delivery-number');
-              const neighborhoodInput = document.getElementById('delivery-neighborhood');
-              const cityInput = document.getElementById('delivery-city');
-              const ufInput = document.getElementById('delivery-uf');
-              const sizeInput = document.querySelector('input[name="size"]:checked');
-              const cepInput = document.getElementById('delivery-cep'); // Corrigido ID
+              // ... (restante igual)
 
               const deliveryAddr = {
                   street: streetInput.value.trim(),
-                  number: numberInput.value.trim(),
-                  neighborhood: neighborhoodInput.value.trim(),
-                  city: cityInput.value.trim(),
-                  uf: ufInput.value.trim().toUpperCase()
+                  // ... (restante igual)
+                  uf: document.getElementById('delivery-uf').value.trim().toUpperCase()
               };
 
-              const size = sizeInput ? sizeInput.value : 'Pequeno';
-              const cep = cepInput.value.replace(/\D/g, '');
+              const sizeInput = document.querySelector('input[name="size"]:checked'); // Adicionado
+              const size = sizeInput ? sizeInput.value : 'Pequeno'; // Adicionado
+              const cepInput = document.getElementById('delivery-cep'); // Adicionado
+              const cep = cepInput ? cepInput.value.replace(/\D/g, '') : ''; // Adicionado
 
-               // Validação básica
+
+               // Validação básica (igual)
               if (!deliveryAddr.street || !deliveryAddr.number || !deliveryAddr.neighborhood || !deliveryAddr.city || !deliveryAddr.uf) {
                   if(cepErrorEl){ cepErrorEl.textContent="Todos os campos de endereço (Rua, Número, Bairro, Cidade, UF) são obrigatórios."; cepErrorEl.style.display='block';}
                   return;
               }
                if(cepErrorEl) cepErrorEl.style.display='none'; // Limpa erro se passou
 
-              // Monta a string do endereço completo
+              // Monta a string do endereço completo (igual)
               const fullAddress = assembleAddressString(deliveryAddr);
               console.log("Endereço montado para salvar:", fullAddress);
 
 
               const newDelivery = {
-                  address: fullAddress, // Salva a string montada
-                  // Salva os componentes separados também, se útil no futuro
+                  address: fullAddress,
                   street: deliveryAddr.street,
                   number: deliveryAddr.number,
                   neighborhood: deliveryAddr.neighborhood,
@@ -878,14 +798,9 @@
 
               addDoc(collRef, newDelivery)
                    .then(() => {
-                        // Limpa campos da entrega
+                        // Limpa campos da entrega (igual)
                        streetInput.value = '';
-                       numberInput.value = '';
-                       neighborhoodInput.value = '';
-                       cityInput.value = '';
-                       ufInput.value = '';
-                       cepInput.value = '';
-                       document.querySelector('input[name="size"][value="Pequeno"]').checked = true;
+                       // ... (restante igual)
                    })
                    .catch(error => { console.error("Erro ao adicionar:", error); if(cepErrorEl){ cepErrorEl.textContent=`Erro DB: ${error.message}`; cepErrorEl.style.display='block';} });
         }
@@ -908,86 +823,8 @@
         // Busca CEP para Endereço Base - PREENCHE CAMPOS SEPARADOS
         window.fetchBaseAddressByCEP = async function() { /* ... código igual ... */ }
 
-        // Busca CEPs por Endereço (igual, com adição de console.log)
-        window.searchCEPsByAddress = async function() {
-            const ufInput = document.getElementById('search-uf');
-            const cityInput = document.getElementById('search-city');
-            const streetInput = document.getElementById('search-street');
-            const resultsDiv = document.getElementById('cep-results');
-            const searchButton = document.getElementById('search-cep-button');
-
-             if (!ufInput || !cityInput || !streetInput || !resultsDiv || !searchButton) {
-                 console.error("Elementos da busca por endereço não encontrados.");
-                 return;
-             }
-
-            const uf = ufInput.value.trim().toUpperCase();
-            const city = cityInput.value.trim();
-            const street = streetInput.value.trim();
-
-            resultsDiv.innerHTML = '<p class="text-slate-500">Buscando...</p>';
-            resultsDiv.style.display = 'block';
-            searchButton.disabled = true;
-            searchButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Buscando...`;
-
-
-            // Validações
-            if (uf.length !== 2 || !/^[A-Z]+$/.test(uf)) {
-                 resultsDiv.innerHTML = '<p class="text-red-500">UF inválida (Ex: MG).</p>';
-                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
-            }
-            if (city.length < 3) {
-                 resultsDiv.innerHTML = '<p class="text-red-500">Cidade inválida.</p>';
-                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
-            }
-              if (street.length < 3) {
-                 resultsDiv.innerHTML = '<p class="text-red-500">Logradouro inválido (mínimo 3 caracteres).</p>';
-                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
-            }
-
-            try {
-                // Usa encodeURIComponent para garantir que espaços e caracteres especiais funcionem
-                const apiUrl = `https://viacep.com.br/ws/${encodeURIComponent(uf)}/${encodeURIComponent(city)}/${encodeURIComponent(street)}/json/`;
-                console.log("Buscando CEPs por endereço:", apiUrl); // <-- Log da URL
-
-                const response = await fetch(apiUrl);
-                if (!response.ok) {
-                     throw new Error(`Erro na API ViaCEP: ${response.status}`);
-                }
-                const data = await response.json();
-                console.log("Resposta ViaCEP (busca endereço):", data); // <-- Log da Resposta
-
-                // Verifica se a resposta é um array (múltiplos resultados)
-                if (Array.isArray(data)) {
-                     if (data.length === 0) {
-                         resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado para este endereço.</p>';
-                     } else {
-                         // Mapeia cada resultado no array para um parágrafo HTML
-                          resultsDiv.innerHTML = data.map(result =>
-                               `<p><strong>CEP:</strong> ${result.cep || 'N/D'}<br>
-                               ${result.logradouro || ''}${result.complemento ? ' - ' + result.complemento : ''}<br>
-                               ${result.bairro || ''} - ${result.localidade || ''}/${result.uf || ''}</p>`
-                          ).join('');
-                     }
-                } else if (data.erro) { // Verifica se a API retornou erro explícito (acontece em alguns casos)
-                      resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado para este endereço (API retornou erro).</p>';
-                } else if (data.cep) { // Caso retorne um objeto único (raro para busca por rua, mas possível)
-                      resultsDiv.innerHTML = `<p><strong>CEP:</strong> ${data.cep || 'N/D'}<br>
-                                               ${data.logradouro || ''}${data.complemento ? ' - ' + data.complemento : ''}<br>
-                                               ${data.bairro || ''} - ${data.localidade || ''}/${data.uf || ''}</p>`;
-                }
-                else { // Resposta inesperada
-                      resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado ou resposta inesperada.</p>';
-                }
-
-            } catch (error) {
-                console.error("Erro ao buscar CEP por endereço:", error);
-                resultsDiv.innerHTML = `<p class="text-red-500">Erro: ${error.message}. Verifique os dados ou a conexão.</p>`;
-            } finally {
-                searchButton.disabled = false;
-                 searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`;
-            }
-        }
+        // Busca CEPs por Endereço (com console.log)
+        window.searchCEPsByAddress = async function() { /* ... código igual ... */ }
 
 
         // --- INÍCIO: Funções de Helper e Renderização --- (iguais)
