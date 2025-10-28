@@ -538,7 +538,7 @@
             doc, Timestamp, setDoc, getDoc, updateDoc, orderBy
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Variáveis Globais (iguais)
+        // Variáveis Globais
         let app;
         let db;
         let auth;
@@ -551,7 +551,7 @@
 
         let baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
 
-        // Elementos DOM (iguais)
+        // Elementos DOM
         const loginContainer = document.getElementById('login-container');
         const appContainer = document.getElementById('app-container');
         const userDisplayElement = document.getElementById('user-display-name');
@@ -564,7 +564,7 @@
         const resendVerificationButton = document.getElementById('resend-verification-button');
         const resendStatusElement = document.getElementById('resend-status');
 
-        // Configuração Firebase (Sua Configuração) (igual)
+        // Configuração Firebase
         const firebaseConfig = {
          apiKey: "AIzaSyCmskiIAKHmyfw1FapQzQsK1I7GzXgdVcc",
          authDomain: "otimizadorderotas-4ecad.firebaseapp.com",
@@ -577,11 +577,50 @@
 
         let firebaseInitialized = false;
 
-        // Função para atualizar UI de login/loading (igual)
-        function updateLoginUI(isLoading, message, isError = false) { /* ... código igual ... */ }
+        // Função para atualizar UI de login/loading
+        function updateLoginUI(isLoading, message, isError = false) {
+             console.log(`[UI Update] isLoading=${isLoading}, message=${message}, isError=${isError}`);
+             if (loginMessageElement) loginMessageElement.textContent = message;
+             if (authErrorElement) {
+                 authErrorElement.textContent = isError ? message : '';
+                 authErrorElement.style.display = isError ? 'block' : 'none';
+                 if(isError && loginMessageElement) loginMessageElement.style.display = 'none';
+                 else if (loginMessageElement) loginMessageElement.style.display = 'block';
+             }
+             if (loginButton) loginButton.style.display = (!isLoading && !isError) ? 'inline-flex' : 'none';
+             if (loadingSpinner) loadingSpinner.style.display = isLoading ? 'block' : 'none';
+             if (staticIcon) staticIcon.style.display = isLoading ? 'none' : 'block';
+        }
 
-        // --- Monta String de Endereço --- (igual)
-        function assembleAddressString(addrObj) { /* ... código igual ... */ }
+        // --- Monta String de Endereço ---
+        function assembleAddressString(addrObj) {
+            let parts = [];
+            if (addrObj.street) parts.push(addrObj.street);
+            if (addrObj.number) parts.push(addrObj.number);
+            if (addrObj.neighborhood) parts.push(addrObj.neighborhood);
+            if (addrObj.city) parts.push(addrObj.city);
+
+            let addressStr = parts.slice(0, -1).join(', '); // Junta rua, numero, bairro com vírgula
+            if (parts.length > 1 && parts[parts.length -1]) { // Adiciona cidade se houver e não for vazia
+                 addressStr += `, ${parts[parts.length - 1]}`;
+            } else if (parts.length === 1 && parts[0]) { // Se só tiver um campo (e não for vazio)
+                addressStr = parts[0];
+            } else {
+                addressStr = ''; // String vazia se não houver partes válidas
+            }
+
+
+            if (addrObj.uf) {
+                addressStr += (addressStr ? ' - ' : '') + addrObj.uf; // Adiciona UF no final
+            }
+             // Caso especial: se SÓ tiver bairro, cidade e UF (ex: CEP geral da cidade)
+            if (!addrObj.street && !addrObj.number && addrObj.neighborhood && addrObj.city && addrObj.uf) {
+                 addressStr = `${addrObj.neighborhood}, ${addrObj.city} - ${addrObj.uf}`;
+            }
+            // Garante remover espaços extras e vírgulas duplicadas ou no final
+            addressStr = addressStr.replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim();
+            return addressStr;
+        }
 
 
         // Espera o DOM carregar antes de inicializar Firebase
@@ -606,33 +645,27 @@
                          console.log("getRedirectResult concluído.");
                          if (result && result.user) {
                              console.log("Redirect Result OBTEVE usuário:", result.user.uid);
-                             // O onAuthStateChanged (configurado abaixo) vai pegar esse usuário
-                             // Não precisa fazer nada aqui, apenas deixar o listener agir
                          } else {
-                             console.log("Nenhum usuário obtido do Redirect Result (pode ser a primeira visita ou refresh).");
-                             // Se não veio do redirect E não está logado, o listener abaixo mostrará o botão de login
+                             console.log("Nenhum usuário obtido do Redirect Result.");
                          }
-                         // Configura o listener DEPOIS de verificar o redirect
-                         setupAuthStateListener();
+                         setupAuthStateListener(); // Configura DEPOIS de verificar redirect
                      })
                      .catch((error) => {
                          authReady = true; // Marca como pronto mesmo com erro
                          console.error("Erro ao verificar Redirect Result:", error.code, error.message);
                          updateLoginUI(false, `Erro na verificação inicial: ${error.message}`, true);
-                         // Configura o listener mesmo com erro, para pegar estado logado anterior ou mostrar botão
-                         setupAuthStateListener();
+                         setupAuthStateListener(); // Configura mesmo com erro
                      });
 
-                 // Função que configura o listener principal (igual à anterior)
+                 // Função que configura o listener principal
                  function setupAuthStateListener() {
                      console.log("Configurando onAuthStateChanged listener...");
                      onAuthStateChanged(auth, async (user) => {
                          console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null', "AuthReady:", authReady);
 
-                         // Só age se a verificação inicial (getRedirectResult) já terminou
                          if (!authReady) {
                              console.log("Auth ainda não está pronta, aguardando...");
-                             return; // Não faz nada até o getRedirectResult terminar
+                             return;
                          }
 
                          if (user) {
@@ -644,11 +677,9 @@
                                 userDisplayElement.title = user.email || `ID: ${userId}`;
                             }
 
-                            // Verifica e envia email de verificação se necessário (lógica igual)
                             if (!user.emailVerified) {
-                                // ... (código igual para enviar email) ...
+                                // Lógica para enviar email de verificação...
                             } else {
-                                console.log("E-mail já verificado.");
                                 if (emailVerificationBar) emailVerificationBar.style.display = 'none';
                             }
 
@@ -662,11 +693,27 @@
                              console.log("Estado: DESLOGADO.");
                              userId = null;
                              baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
-                             // Limpa campos... (código igual)
+                             // Limpa campos base
+                             document.getElementById('start-street').value = '';
+                             document.getElementById('start-number').value = '';
+                             document.getElementById('start-neighborhood').value = '';
+                             document.getElementById('start-city').value = '';
+                             document.getElementById('start-uf').value = '';
+                             document.getElementById('start-cep').value = '';
+                             // Limpa campos entrega
+                             document.getElementById('delivery-street').value = '';
+                             document.getElementById('delivery-number').value = '';
+                             document.getElementById('delivery-neighborhood').value = '';
+                             document.getElementById('delivery-city').value = '';
+                             document.getElementById('delivery-uf').value = '';
+                             document.getElementById('delivery-cep').value = '';
+                             const sizePequenoRadio = document.querySelector('input[name="size"][value="Pequeno"]');
+                             if (sizePequenoRadio) sizePequenoRadio.checked = true;
+
 
                              if (emailVerificationBar) emailVerificationBar.style.display = 'none';
                              if (appContainer) appContainer.style.display = 'none';
-                             if (loginContainer) loginContainer.style.display = 'flex'; // MOSTRA tela de login
+                             if (loginContainer) loginContainer.style.display = 'flex';
                              if(firebaseInitialized) {
                                  updateLoginUI(false, "Faça login para salvar e gerenciar suas rotas.");
                              } else {
@@ -678,7 +725,6 @@
                      });
                  }
                 // --- FIM: Lógica de Autenticação ---
-
 
              } catch (initError) {
                   console.error("Erro CRÍTICO ao inicializar Firebase:", initError);
@@ -702,34 +748,131 @@
              if (authErrorElement) authErrorElement.style.display = 'none'; // Esconde erro anterior
              try {
                  await signInWithRedirect(auth, provider);
-                 // O navegador vai redirecionar; o resultado será pego por getRedirectResult no próximo load
              } catch (error) {
                  console.error("Erro ao iniciar signInWithRedirect:", error);
-                 // Atualiza UI para mostrar o erro e o botão novamente
                  updateLoginUI(false, `Erro ao tentar login: ${error.code} - ${error.message}`, true);
              }
         };
 
-        // Função para Reenviar Email de Verificação (igual)
+        // Função para Reenviar Email de Verificação
         window.resendVerificationEmail = async () => { /* ... código igual ... */ };
 
 
-        // Logout (igual)
-        window.logout = async () => { /* ... código igual ... */ };
+        // Logout com Logs
+        window.logout = async () => {
+            console.log("Logout function called."); // Log 1: Function entry
+            if (!auth || !firebaseInitialized) {
+                console.warn("Logout attempt aborted: Auth or Firebase not ready.");
+                return;
+            }
+            try {
+                console.log("Attempting signOut..."); // Log 2: Before signOut
+                await signOut(auth);
+                console.log("signOut successful. onAuthStateChanged should trigger."); // Log 3: After successful signOut
+                // O onAuthStateChanged listener agora faz toda a limpeza e mudança de UI
+            } catch (error) {
+                console.error("Erro CRÍTICO ao sair:", error); // Log 4: Error during signOut
+                // Considerar mostrar uma mensagem mais amigável ao usuário aqui
+            }
+        };
 
-        // --- Controle de Visualização --- (igual)
-        window.showView = (viewId) => { /* ... código igual ... */ };
+
+        // --- Controle de Visualização ---
+        window.showView = (viewId) => {
+            console.log("Mudando para view:", viewId);
+            currentView = viewId;
+            const routeV = document.getElementById('route-view');
+            const mgmtV = document.getElementById('management-view');
+            if (routeV) routeV.style.display = 'none';
+            if (mgmtV) mgmtV.style.display = 'none';
+
+            const targetView = document.getElementById(viewId);
+            if (targetView) targetView.style.display = 'block';
+
+            const navRoute = document.getElementById('nav-route');
+            const navMgmt = document.getElementById('nav-management');
+            if (navRoute) navRoute.classList.toggle('active', viewId === 'route-view');
+            if (navMgmt) navMgmt.classList.toggle('active', viewId === 'management-view');
+
+            // Renderiza a lista apropriada para a view
+            if (viewId === 'management-view') {
+                renderManagementList(currentDeliveries);
+            } else if (firebaseInitialized && authReady && userId) { // Só renderiza rota se logado
+                renderRouteList(lastOptimizedRoute, lastOptimizedRoute.length === 0 || !lastOptimizedRoute[0]?.distanceFromPrevious, {}); // Usa a última rota salva (otimizada ou básica)
+            }
+        };
 
         // --- Funções Firebase ---
-        function getFirestoreCollection(collectionName) { /* ... código igual ... */ }
-        function getFirestoreDoc(collectionName, docId) { /* ... código igual ... */ }
-        function getSettingsDocRef() { /* ... código igual ... */ }
+        function getFirestoreCollection(collectionName) {
+            if (!userId || !db) {
+                console.warn(`Firestore não disponível ou usuário não logado para acessar coleção: ${collectionName}`);
+                return null;
+            }
+            return collection(db, `users/${userId}/${collectionName}`);
+        }
+        function getFirestoreDoc(collectionName, docId) {
+            const collRef = getFirestoreCollection(collectionName);
+            if (!collRef || !docId) return null;
+            return doc(collRef, docId);
+        }
+        function getSettingsDocRef() {
+            if (!userId || !db) return null;
+            return doc(db, `users/${userId}/config/appSettings`);
+        }
 
-        // Salva o endereço base separado (igual)
-        async function saveSettings(settingsData) { /* ... código igual ... */ }
+        // Salva o endereço base separado
+        async function saveSettings(settingsData) {
+            const docRef = getSettingsDocRef();
+            if (!docRef) { console.warn("Não foi possível salvar config: Ref nula."); return; }
+            try {
+                // Salva o objeto baseAddress inteiro
+                await setDoc(docRef, { baseAddress: settingsData }, { merge: true });
+                console.log("Settings saved:", settingsData);
+                baseAddress = { ...settingsData }; // Atualiza a variável local
+            } catch (error) { console.error("Error saving settings:", error); }
+        }
 
-        // Carrega o endereço base separado e preenche os campos (igual)
-        async function loadSettings() { /* ... código igual ... */ }
+        // Carrega o endereço base separado e preenche os campos
+        async function loadSettings() {
+             const docRef = getSettingsDocRef();
+             if (!docRef) { console.warn("Não foi possível carregar config: Ref nula."); return; }
+             try {
+                 const docSnap = await getDoc(docRef);
+                 if (docSnap.exists() && docSnap.data().baseAddress) {
+                     const settings = docSnap.data().baseAddress;
+                     baseAddress = { // Atualiza a variável global
+                         street: settings.street || '',
+                         number: settings.number || '',
+                         neighborhood: settings.neighborhood || '',
+                         city: settings.city || '',
+                         uf: settings.uf || ''
+                     };
+                     // Preenche os campos do formulário
+                     document.getElementById('start-street').value = baseAddress.street;
+                     document.getElementById('start-number').value = baseAddress.number;
+                     document.getElementById('start-neighborhood').value = baseAddress.neighborhood;
+                     document.getElementById('start-city').value = baseAddress.city;
+                     document.getElementById('start-uf').value = baseAddress.uf;
+                 } else {
+                     // Limpa variável global e campos se não houver dados salvos
+                     baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
+                     document.getElementById('start-street').value = '';
+                     document.getElementById('start-number').value = '';
+                     document.getElementById('start-neighborhood').value = '';
+                     document.getElementById('start-city').value = '';
+                     document.getElementById('start-uf').value = '';
+                 }
+             } catch (error) {
+                 console.error("Error loading settings:", error);
+                 // Limpa em caso de erro também
+                 baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
+                 document.getElementById('start-street').value = '';
+                 document.getElementById('start-number').value = '';
+                 document.getElementById('start-neighborhood').value = '';
+                 document.getElementById('start-city').value = '';
+                 document.getElementById('start-uf').value = '';
+             }
+        }
 
         // Adiciona entrega montando o endereço (com verificação extra)
         window.addDelivery = function() {
@@ -755,36 +898,40 @@
                    return;
               }
 
-              // Pega valores dos campos separados (igual)
+              // Pega valores dos campos separados
               const streetInput = document.getElementById('delivery-street');
-              // ... (restante igual)
+              const numberInput = document.getElementById('delivery-number');
+              const neighborhoodInput = document.getElementById('delivery-neighborhood');
+              const cityInput = document.getElementById('delivery-city');
+              const ufInput = document.getElementById('delivery-uf');
+              const sizeInput = document.querySelector('input[name="size"]:checked');
+              const cepInput = document.getElementById('delivery-cep');
 
               const deliveryAddr = {
                   street: streetInput.value.trim(),
-                  // ... (restante igual)
-                  uf: document.getElementById('delivery-uf').value.trim().toUpperCase()
+                  number: numberInput.value.trim(),
+                  neighborhood: neighborhoodInput.value.trim(),
+                  city: cityInput.value.trim(),
+                  uf: ufInput.value.trim().toUpperCase()
               };
 
-              const sizeInput = document.querySelector('input[name="size"]:checked'); // Adicionado
-              const size = sizeInput ? sizeInput.value : 'Pequeno'; // Adicionado
-              const cepInput = document.getElementById('delivery-cep'); // Adicionado
-              const cep = cepInput ? cepInput.value.replace(/\D/g, '') : ''; // Adicionado
+              const size = sizeInput ? sizeInput.value : 'Pequeno';
+              const cep = cepInput.value.replace(/\D/g, '');
 
-
-               // Validação básica (igual)
+               // Validação básica
               if (!deliveryAddr.street || !deliveryAddr.number || !deliveryAddr.neighborhood || !deliveryAddr.city || !deliveryAddr.uf) {
                   if(cepErrorEl){ cepErrorEl.textContent="Todos os campos de endereço (Rua, Número, Bairro, Cidade, UF) são obrigatórios."; cepErrorEl.style.display='block';}
                   return;
               }
                if(cepErrorEl) cepErrorEl.style.display='none'; // Limpa erro se passou
 
-              // Monta a string do endereço completo (igual)
+              // Monta a string do endereço completo
               const fullAddress = assembleAddressString(deliveryAddr);
               console.log("Endereço montado para salvar:", fullAddress);
 
 
               const newDelivery = {
-                  address: fullAddress,
+                  address: fullAddress, // Salva a string montada
                   street: deliveryAddr.street,
                   number: deliveryAddr.number,
                   neighborhood: deliveryAddr.neighborhood,
@@ -798,30 +945,370 @@
 
               addDoc(collRef, newDelivery)
                    .then(() => {
-                        // Limpa campos da entrega (igual)
+                        // Limpa campos da entrega
                        streetInput.value = '';
-                       // ... (restante igual)
+                       numberInput.value = '';
+                       neighborhoodInput.value = '';
+                       cityInput.value = '';
+                       ufInput.value = '';
+                       cepInput.value = '';
+                       document.querySelector('input[name="size"][value="Pequeno"]').checked = true;
                    })
                    .catch(error => { console.error("Erro ao adicionar:", error); if(cepErrorEl){ cepErrorEl.textContent=`Erro DB: ${error.message}`; cepErrorEl.style.display='block';} });
         }
-        function loadDeliveries() { /* ... código igual ... */ }
-        window.toggleDeliveryStatus = async (deliveryId, currentStatus) => { /* ... código igual ... */ };
-        window.deleteDelivery = function(deliveryId) { /* ... código igual ... */ };
+        function loadDeliveries() {
+            const collRef = getFirestoreCollection('deliveries');
+            if (!collRef) {
+                 console.warn("Não foi possível carregar entregas: coleção nula.");
+                 renderRouteList([], true, {});
+                 renderManagementList([]);
+                 return;
+            }
+            if (deliveriesUnsubscribe) deliveriesUnsubscribe(); // Cancela listener anterior, se houver
+            const q = query(collRef, orderBy("createdAt", "desc"));
+            deliveriesUnsubscribe = onSnapshot(q, (querySnapshot) => {
+                currentDeliveries = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                console.log("Entregas carregadas/atualizadas:", currentDeliveries.length);
+                // Otimiza silenciosamente e atualiza a rota atual (se visível)
+                runOptimization(true); // Chama runOptimization que chama optimizeAndRenderRoutes
+            }, (error) => {
+                console.error("Erro ao carregar entregas (onSnapshot):", error);
+                // Limpa listas em caso de erro no listener
+                renderRouteList([], true, {});
+                renderManagementList([]);
+            });
+        }
+        window.toggleDeliveryStatus = async (deliveryId, currentStatus) => {
+             const docRef = getFirestoreDoc('deliveries', deliveryId);
+             if (!docRef) return;
+             let newStatus;
+             if (currentStatus === 'pending') newStatus = 'delivered';
+             else if (currentStatus === 'delivered') newStatus = 'not_home';
+             else newStatus = 'pending'; // Volta para pendente se estava "não estava"
+             try {
+                 await updateDoc(docRef, { status: newStatus });
+                 console.log(`Status de ${deliveryId} atualizado para ${newStatus}`);
+             } catch (error) {
+                 console.error("Erro ao atualizar status:", error);
+             }
+        };
+
+        // deleteDelivery é chamado por handleConfirmDelete
+        window.deleteDelivery = function(deliveryId) {
+             const docRef = getFirestoreDoc('deliveries', deliveryId);
+             if (!docRef) { console.warn("Não foi possível excluir: Ref nula."); return; }
+             deleteDoc(docRef)
+                 .then(() => console.log("Excluído:", deliveryId))
+                 .catch(error => { console.error("Erro ao excluir:", error); });
+        };
 
         // --- Otimização e Rota ---
-        window.runOptimization = async function(isInitialLoad = false) { /* ... código igual, já valida endereço base ... */ }
+        window.runOptimization = async function(isInitialLoad = false) {
+             const routeStatus = document.getElementById('route-status');
+             const optimizeButton = document.getElementById('update-route-button');
+            // Pega valores dos campos base e atualiza o objeto baseAddress
+            baseAddress.street = document.getElementById('start-street').value.trim();
+            baseAddress.number = document.getElementById('start-number').value.trim();
+            baseAddress.neighborhood = document.getElementById('start-neighborhood').value.trim();
+            baseAddress.city = document.getElementById('start-city').value.trim();
+            baseAddress.uf = document.getElementById('start-uf').value.trim().toUpperCase();
 
-        // Função optimizeAndRenderRoutes permanece a mesma da sua versão anterior (com API V1)
-        async function optimizeAndRenderRoutes(allDeliveries, isInitialLoad = false, startAddrString = null) { /* ... código igual ... */ }
+            // Monta a string do endereço base a partir do objeto atualizado
+            const startAddrString = assembleAddressString(baseAddress);
+            console.log("Endereço base montado para otimização:", startAddrString);
+
+             // Salva as alterações (mesmo que manuais)
+             await saveSettings(baseAddress);
+
+             if (!isInitialLoad) {
+                 console.log("Iniciando otimização manual...");
+                 if (routeStatus) { routeStatus.textContent = "Otimizando rota..."; routeStatus.style.display = 'block'; }
+                 if (optimizeButton) optimizeButton.disabled = true;
+             }
+
+             // Passa a string montada do endereço base
+             await optimizeAndRenderRoutes(currentDeliveries, isInitialLoad, startAddrString);
+
+             if (!isInitialLoad && optimizeButton) {
+                 optimizeButton.disabled = false;
+             }
+        }
+
+        // Função optimizeAndRenderRoutes (usa API V1 como solicitado anteriormente)
+        async function optimizeAndRenderRoutes(allDeliveries, isInitialLoad = false, startAddrString = null) {
+            const routeStatus = document.getElementById('route-status');
+            // Usa a string passada ou monta uma nova a partir da variável global baseAddress
+            const startAddr = startAddrString !== null ? startAddrString : assembleAddressString(baseAddress);
+            const deliveriesToOptimize = allDeliveries.filter(d => d.status === 'pending' || d.status === 'not_home');
+            const failedDeliveries = {};
+
+            console.log(`optimizeAndRenderRoutes chamado. isInitialLoad: ${isInitialLoad}, startAddr: ${startAddr}, deliveriesToOptimize: ${deliveriesToOptimize.length}`);
+
+            if (!startAddr && deliveriesToOptimize.length > 0) {
+                console.warn("Endereço de partida não definido. Usando ordenação básica.");
+                if (routeStatus && !isInitialLoad) routeStatus.textContent = "Ordenação básica (Defina um endereço de partida).";
+                const basicSorted = basicSortDeliveries(allDeliveries);
+                lastOptimizedRoute = basicSorted; // Salva rota básica
+                 // Só atualiza a view se for a view de rota
+                 if (currentView === 'route-view') {
+                    renderRouteList(basicSorted, true, {});
+                }
+                return;
+            } else if (deliveriesToOptimize.length === 0) {
+                console.log("Nenhuma entrega pendente/não em casa para otimizar.");
+                lastOptimizedRoute = [];
+                 // Só atualiza a view se for a view de rota
+                 if (currentView === 'route-view') {
+                    renderRouteList([], true, {});
+                }
+                if (routeStatus) routeStatus.style.display = 'none';
+                return;
+            }
+
+            if (!isInitialLoad && routeStatus) {
+                routeStatus.textContent = "Buscando coordenadas...";
+                routeStatus.style.display = 'block';
+            }
+
+            try {
+                // Chave V1 (como no código anterior fornecido por você)
+                const apiKey = "5b3ce3597851110001cf624852da619a1e2f42b7984cc26314de2636";
+
+                const locations = [startAddr, ...deliveriesToOptimize.map(d => d.address)];
+                const coordinates = [];
+                const geoCache = new Map(); // Simples cache em memória
+
+                for (let i = 0; i < locations.length; i++) {
+                    const address = locations[i];
+                    const isStart = i === 0;
+                    const delivery = isStart ? null : deliveriesToOptimize[i - 1];
+                    const cacheKey = address + (delivery ? delivery.id : 'start');
+
+                    if (geoCache.has(cacheKey)) {
+                        coordinates.push(geoCache.get(cacheKey));
+                        continue;
+                    }
+                    if (!isInitialLoad && routeStatus) routeStatus.textContent = `Buscando coord. (${i + 1}/${locations.length})...`;
+
+                    await new Promise(resolve => setTimeout(resolve, 1500)); // Delay
+
+                    try {
+                        // Endpoint V1 (como no código anterior)
+                        const geoResponse = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${apiKey}&text=${encodeURIComponent(address)}`);
+                        if (!geoResponse.ok) throw new Error(`Status ${geoResponse.status}`);
+                        const geoData = await geoResponse.json();
+                        if (!geoData.features || geoData.features.length === 0) throw new Error(`Não encontrado`);
+
+                        const coord = geoData.features[0].geometry.coordinates; // [lon, lat]
+                        geoCache.set(cacheKey, coord);
+                        coordinates.push(coord);
+                    } catch (geoError) {
+                        console.error(`Falha ao geocodificar "${address}":`, geoError.message);
+                        if (isStart) {
+                            throw new Error(`Falha ao encontrar coordenadas do endereço de partida "${startAddr}". Verifique o endereço.`);
+                        } else if (delivery) {
+                            failedDeliveries[delivery.id] = {...delivery, error: geoError.message};
+                        }
+                        coordinates.push(null); // Adiciona null para manter índice
+                    }
+                }
+                console.log("Coordenadas obtidas:", coordinates);
+
+                const validDeliveriesWithCoords = deliveriesToOptimize
+                    .map((delivery, index) => ({
+                        ...delivery,
+                        coords: coordinates[index + 1] ? { latitude: coordinates[index + 1][1], longitude: coordinates[index + 1][0] } : null
+                    }))
+                    .filter(d => d.coords !== null);
+
+                if (validDeliveriesWithCoords.length === 0) {
+                     // Se não tem válidas, mas tem falhas
+                     if (Object.keys(failedDeliveries).length > 0) {
+                        console.warn("Nenhuma entrega válida encontrada, mostrando falhas.");
+                        lastOptimizedRoute = []; // Nenhuma rota otimizada
+                         if (currentView === 'route-view') {
+                            renderRouteList([], true, failedDeliveries); // Usa modo básico para mostrar falhas
+                        }
+                        if (routeStatus && !isInitialLoad) routeStatus.textContent = "Nenhuma entrega pôde ser localizada.";
+                     } else { // Se não tem nem válidas nem falhas (lista inicial vazia)
+                        console.log("Nenhuma entrega válida ou com falha para processar.");
+                        lastOptimizedRoute = [];
+                         if (currentView === 'route-view') {
+                            renderRouteList([], true, {});
+                        }
+                        if (routeStatus) routeStatus.style.display = 'none';
+                     }
+                    return; // Interrompe aqui se não há entregas válidas
+                }
+
+
+                // Otimização (Vizinho Mais Próximo)
+                if (!isInitialLoad && routeStatus) routeStatus.textContent = `Calculando rota para ${validDeliveriesWithCoords.length} entregas...`;
+                let currentCoords = { latitude: coordinates[0][1], longitude: coordinates[0][0] };
+                let remainingValidDeliveries = [...validDeliveriesWithCoords];
+                let optimizedRoute = [];
+
+                while (remainingValidDeliveries.length > 0) {
+                    let closestDistance = Infinity;
+                    let closestIndex = -1;
+                    remainingValidDeliveries.forEach((delivery, index) => {
+                        const distance = getHaversineDistance(currentCoords, delivery.coords);
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                            closestIndex = index;
+                        }
+                    });
+                    const closestDelivery = remainingValidDeliveries.splice(closestIndex, 1)[0];
+                    closestDelivery.distanceFromPrevious = closestDistance;
+                    optimizedRoute.push(closestDelivery);
+                    currentCoords = closestDelivery.coords;
+                }
+
+                console.log("Rota otimizada:", optimizedRoute);
+                lastOptimizedRoute = optimizedRoute; // Salva a rota otimizada
+
+                if (routeStatus && !isInitialLoad) {
+                    let statusMsg = `Rota otimizada para ${optimizedRoute.length} entregas!`;
+                    if (Object.keys(failedDeliveries).length > 0) {
+                        statusMsg += ` (${Object.keys(failedDeliveries).length} não localizadas).`;
+                    }
+                    routeStatus.textContent = statusMsg;
+                } else if (routeStatus) {
+                    routeStatus.style.display = 'none';
+                }
+
+                 // Só atualiza a view se for a view de rota
+                 if (currentView === 'route-view') {
+                    renderRouteList(optimizedRoute, false, failedDeliveries);
+                }
+
+
+            } catch (error) {
+                console.error("Erro durante otimização/geocodificação:", error);
+                if (routeStatus && !isInitialLoad) routeStatus.textContent = `Erro: ${error.message}. Usando ordenação básica.`;
+                const basicSorted = basicSortDeliveries(allDeliveries);
+                lastOptimizedRoute = basicSorted; // Salva a rota básica
+                 // Só atualiza a view se for a view de rota
+                 if (currentView === 'route-view') {
+                    renderRouteList(basicSorted, true, failedDeliveries);
+                }
+            }
+        }
 
 
         // --- Busca CEP ---
 
         // Busca CEP para Nova Entrega - PREENCHE CAMPOS SEPARADOS
-        window.fetchAddressByCEP = async function() { /* ... código igual ... */ }
+        window.fetchAddressByCEP = async function() {
+            const cepInput = document.getElementById('delivery-cep'); // Corrigido ID
+            const cep = cepInput ? cepInput.value.replace(/\D/g, '') : '';
+            const streetInput = document.getElementById('delivery-street');
+            const numberInput = document.getElementById('delivery-number');
+            const neighborhoodInput = document.getElementById('delivery-neighborhood');
+            const cityInput = document.getElementById('delivery-city');
+            const ufInput = document.getElementById('delivery-uf');
+            const errorElement = document.getElementById('delivery-cep-error'); // Corrigido ID
+            const lookupButton = document.getElementById('delivery-cep-lookup-button'); // Corrigido ID
+
+            if (errorElement) errorElement.style.display = 'none';
+            if (!cepInput || !streetInput || !neighborhoodInput || !cityInput || !ufInput || !errorElement || !lookupButton) {
+                console.error("Elementos do formulário de CEP de entrega não encontrados.");
+                return;
+            }
+
+            if (cep.length !== 8) { /* ... validação ... */ return; }
+
+            lookupButton.disabled = true;
+            lookupButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" ...></svg> Buscando...`;
+
+            try {
+                const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                if (!response.ok) throw new Error(`Erro API ViaCEP: ${response.status}`);
+                const data = await response.json();
+
+                if (data.erro) {
+                    errorElement.textContent = "CEP não encontrado."; errorElement.style.display = 'block';
+                } else {
+                    streetInput.value = data.logradouro || '';
+                    neighborhoodInput.value = data.bairro || '';
+                    cityInput.value = data.localidade || '';
+                    ufInput.value = data.uf || '';
+                    numberInput.value = ''; // Limpa número para o usuário digitar
+                    numberInput.focus(); // Foca no campo número
+                }
+            } catch (error) {
+                console.error("Erro ao buscar CEP:", error);
+                errorElement.textContent = `Erro: ${error.message}. Verifique a conexão.`; errorElement.style.display = 'block';
+            } finally {
+                lookupButton.disabled = false;
+                lookupButton.innerHTML = `<svg ...></svg> Buscar`; // Restaura ícone
+            }
+        }
 
         // Busca CEP para Endereço Base - PREENCHE CAMPOS SEPARADOS
-        window.fetchBaseAddressByCEP = async function() { /* ... código igual ... */ }
+        window.fetchBaseAddressByCEP = async function() {
+            const cepInput = document.getElementById('start-cep');
+            const cep = cepInput ? cepInput.value.replace(/\D/g, '') : '';
+            const streetInput = document.getElementById('start-street');
+            const numberInput = document.getElementById('start-number');
+            const neighborhoodInput = document.getElementById('start-neighborhood');
+            const cityInput = document.getElementById('start-city');
+            const ufInput = document.getElementById('start-uf');
+            const errorElement = document.getElementById('start-cep-error');
+            const lookupButton = document.getElementById('start-cep-lookup-button');
+
+            let newAddressToSave = null; // Armazena o objeto para salvar depois
+
+            if (errorElement) errorElement.style.display = 'none';
+            if (!cepInput || !streetInput || !neighborhoodInput || !cityInput || !ufInput || !errorElement || !lookupButton || !numberInput) {
+                 console.error("Elementos do formulário de CEP Base não encontrados.");
+                 return;
+            }
+
+            if (cep.length !== 8) { /* ... validação ... */ return; }
+
+            lookupButton.disabled = true;
+            lookupButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" ...></svg> Buscando...`;
+
+            try {
+                const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                if (!response.ok) throw new Error(`Erro API ViaCEP: ${response.status}`);
+                const data = await response.json();
+
+                if (data.erro) {
+                    errorElement.textContent = "CEP não encontrado."; errorElement.style.display = 'block';
+                } else {
+                    // Preenche os campos individuais
+                    streetInput.value = data.logradouro || '';
+                    neighborhoodInput.value = data.bairro || '';
+                    cityInput.value = data.localidade || '';
+                    ufInput.value = data.uf || '';
+                    numberInput.value = ''; // Limpa número
+                    numberInput.focus();
+
+                    // Prepara o objeto para salvar
+                    newAddressToSave = {
+                        street: streetInput.value,
+                        number: '', // Salva número vazio inicialmente
+                        neighborhood: neighborhoodInput.value,
+                        city: cityInput.value,
+                        uf: ufInput.value
+                    };
+                }
+            } catch (error) {
+                console.error("Erro ao buscar CEP da base:", error);
+                errorElement.textContent = `Erro: ${error.message}. Verifique a conexão.`; errorElement.style.display = 'block';
+            } finally {
+                lookupButton.disabled = false;
+                lookupButton.innerHTML = `<svg ...></svg> Buscar`; // Restaura ícone
+            }
+
+            // Salva depois do finally
+            if (newAddressToSave) {
+                await saveSettings(newAddressToSave); // Salva o objeto baseAddress
+            }
+        }
+
 
         // Busca CEPs por Endereço (com console.log)
         window.searchCEPsByAddress = async function() { /* ... código igual ... */ }
