@@ -810,11 +810,11 @@
               const collRef = getFirestoreCollection('deliveries');
               const cepErrorEl = document.getElementById('delivery-cep-error'); // Corrigido ID
 
-               // **CORREÇÃO: Verifica autenticação ANTES de prosseguir**
-               if (!authReady || !userId) {
-                   console.warn("Tentativa de adicionar entrega antes da autenticação estar pronta.");
+               // **CORREÇÃO: Verifica autenticação E db ANTES de prosseguir**
+               if (!authReady || !userId || !db) { // <-- Adicionado !db
+                   console.warn("Tentativa de adicionar entrega antes da autenticação/DB estar pronto.");
                    if(cepErrorEl){
-                       cepErrorEl.textContent="Aguardando autenticação... Tente novamente em alguns segundos.";
+                       cepErrorEl.textContent="Aguardando conexão... Tente novamente em alguns segundos."; // Mensagem mais genérica
                        cepErrorEl.style.display='block';
                    }
                    return;
@@ -908,8 +908,86 @@
         // Busca CEP para Endereço Base - PREENCHE CAMPOS SEPARADOS
         window.fetchBaseAddressByCEP = async function() { /* ... código igual ... */ }
 
-        // Busca CEPs por Endereço (igual)
-        window.searchCEPsByAddress = async function() { /* ... código igual ... */ }
+        // Busca CEPs por Endereço (igual, com adição de console.log)
+        window.searchCEPsByAddress = async function() {
+            const ufInput = document.getElementById('search-uf');
+            const cityInput = document.getElementById('search-city');
+            const streetInput = document.getElementById('search-street');
+            const resultsDiv = document.getElementById('cep-results');
+            const searchButton = document.getElementById('search-cep-button');
+
+             if (!ufInput || !cityInput || !streetInput || !resultsDiv || !searchButton) {
+                 console.error("Elementos da busca por endereço não encontrados.");
+                 return;
+             }
+
+            const uf = ufInput.value.trim().toUpperCase();
+            const city = cityInput.value.trim();
+            const street = streetInput.value.trim();
+
+            resultsDiv.innerHTML = '<p class="text-slate-500">Buscando...</p>';
+            resultsDiv.style.display = 'block';
+            searchButton.disabled = true;
+            searchButton.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Buscando...`;
+
+
+            // Validações
+            if (uf.length !== 2 || !/^[A-Z]+$/.test(uf)) {
+                 resultsDiv.innerHTML = '<p class="text-red-500">UF inválida (Ex: MG).</p>';
+                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
+            }
+            if (city.length < 3) {
+                 resultsDiv.innerHTML = '<p class="text-red-500">Cidade inválida.</p>';
+                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
+            }
+              if (street.length < 3) {
+                 resultsDiv.innerHTML = '<p class="text-red-500">Logradouro inválido (mínimo 3 caracteres).</p>';
+                 searchButton.disabled = false; searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`; return;
+            }
+
+            try {
+                // Usa encodeURIComponent para garantir que espaços e caracteres especiais funcionem
+                const apiUrl = `https://viacep.com.br/ws/${encodeURIComponent(uf)}/${encodeURIComponent(city)}/${encodeURIComponent(street)}/json/`;
+                console.log("Buscando CEPs por endereço:", apiUrl); // <-- Log da URL
+
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                     throw new Error(`Erro na API ViaCEP: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log("Resposta ViaCEP (busca endereço):", data); // <-- Log da Resposta
+
+                // Verifica se a resposta é um array (múltiplos resultados)
+                if (Array.isArray(data)) {
+                     if (data.length === 0) {
+                         resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado para este endereço.</p>';
+                     } else {
+                         // Mapeia cada resultado no array para um parágrafo HTML
+                          resultsDiv.innerHTML = data.map(result =>
+                               `<p><strong>CEP:</strong> ${result.cep || 'N/D'}<br>
+                               ${result.logradouro || ''}${result.complemento ? ' - ' + result.complemento : ''}<br>
+                               ${result.bairro || ''} - ${result.localidade || ''}/${result.uf || ''}</p>`
+                          ).join('');
+                     }
+                } else if (data.erro) { // Verifica se a API retornou erro explícito (acontece em alguns casos)
+                      resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado para este endereço (API retornou erro).</p>';
+                } else if (data.cep) { // Caso retorne um objeto único (raro para busca por rua, mas possível)
+                      resultsDiv.innerHTML = `<p><strong>CEP:</strong> ${data.cep || 'N/D'}<br>
+                                               ${data.logradouro || ''}${data.complemento ? ' - ' + data.complemento : ''}<br>
+                                               ${data.bairro || ''} - ${data.localidade || ''}/${data.uf || ''}</p>`;
+                }
+                else { // Resposta inesperada
+                      resultsDiv.innerHTML = '<p class="text-slate-500">Nenhum CEP encontrado ou resposta inesperada.</p>';
+                }
+
+            } catch (error) {
+                console.error("Erro ao buscar CEP por endereço:", error);
+                resultsDiv.innerHTML = `<p class="text-red-500">Erro: ${error.message}. Verifique os dados ou a conexão.</p>`;
+            } finally {
+                searchButton.disabled = false;
+                 searchButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg> Buscar CEPs`;
+            }
+        }
 
 
         // --- INÍCIO: Funções de Helper e Renderização --- (iguais)
