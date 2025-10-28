@@ -218,27 +218,6 @@
         .nav-button:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
         .nav-button.active { background-color: #ffffff; color: #2563eb; } /* bg-white, text-blue-600 */
 
-        /* Barra de Verificação de Email */
-        #email-verification-bar {
-            background-color: #fef9c3; /* yellow-100 */
-            color: #713f12; /* amber-800 */
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid #fde68a; /* yellow-200 */
-            text-align: center;
-            font-size: 0.875rem; /* text-sm */
-        }
-        #email-verification-bar button {
-            margin-left: 0.5rem;
-            padding: 0.2rem 0.6rem;
-            font-size: 0.75rem; /* text-xs */
-            background-color: #fbbf24; /* amber-400 */
-            color: #78350f; /* amber-900 */
-            border-radius: 0.375rem; /* rounded-md */
-            transition: background-color 0.2s;
-        }
-         #email-verification-bar button:hover { background-color: #f59e0b; /* amber-500 */ }
-         #email-verification-bar button:disabled { opacity: 0.6; cursor: not-allowed; }
-
 
         /* Override Print Styles */
         @media print {
@@ -265,7 +244,7 @@
             .size-pequeno { background-color: #efe !important; color: #060 !important; }
 
             /* Esconde elementos */
-             #add-delivery-form, #cep-search-form, header p, #print-button-container, #start-address-section, #update-route-button, #nav-buttons, #login-container, #email-verification-bar { display: none !important; } /* Esconde barra de email tbm */
+             #add-delivery-form, #cep-search-form, header p, #print-button-container, #start-address-section, #update-route-button, #nav-buttons, #login-container { display: none !important; } /* Esconde login tbm */
              .btn-toggle-status, .btn-danger { display: none !important; }
              #open-maps-button { display: none !important; }
              .failed-deliveries-title, .failed-deliveries-container { display: none !important; }
@@ -357,14 +336,6 @@
                 </button>
             </div>
         </header>
-
-        <!-- Barra de Verificação de Email -->
-        <div id="email-verification-bar" style="display: none;">
-            <span>Seu e-mail ainda não foi verificado.</span>
-            <button id="resend-verification-button" onclick="resendVerificationEmail()">Reenviar e-mail</button>
-            <span id="resend-status" class="text-xs ml-2"></span>
-        </div>
-
 
         <main class="container mx-auto px-6 py-8">
             <div class="max-w-2xl mx-auto">
@@ -492,10 +463,10 @@
         import {
             getAuth,
             onAuthStateChanged,
-            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult, // <-- Adicionado
             GoogleAuthProvider,
-            signOut,
-            sendEmailVerification // <-- Importado
+            signOut
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import {
             getFirestore, collection, addDoc, onSnapshot, query, deleteDoc,
@@ -512,20 +483,17 @@
         let startingAddress = '';
         let lastOptimizedRoute = [];
         let currentView = 'route-view';
-        let authReady = false;
+        let authReady = false; // <-- Nova flag
 
         // Elementos DOM
         const loginContainer = document.getElementById('login-container');
         const appContainer = document.getElementById('app-container');
         const userDisplayElement = document.getElementById('user-display-name');
         const authErrorElement = document.getElementById('auth-error');
-        const loginMessageElement = document.getElementById('login-message');
+        const loginMessageElement = document.getElementById('login-message'); // Para status
         const loginButton = document.getElementById('google-login-button');
         const loadingSpinner = document.getElementById('loading-spinner');
         const staticIcon = document.getElementById('static-icon');
-        const emailVerificationBar = document.getElementById('email-verification-bar'); // <-- Novo
-        const resendVerificationButton = document.getElementById('resend-verification-button'); // <-- Novo
-        const resendStatusElement = document.getElementById('resend-status'); // <-- Novo
 
 
         // Configuração Firebase (Sua Configuração)
@@ -543,7 +511,7 @@
 
         // Função para atualizar UI de login/loading
         function updateLoginUI(isLoading, message, isError = false) {
-             console.log(`[UI Update] isLoading=${isLoading}, message=${message}, isError=${isError}`);
+            console.log(`[UI Update] isLoading=${isLoading}, message=${message}, isError=${isError}`);
             if (loginMessageElement) loginMessageElement.textContent = message;
             if (authErrorElement) {
                 authErrorElement.textContent = isError ? message : '';
@@ -551,6 +519,7 @@
                 if(isError && loginMessageElement) loginMessageElement.style.display = 'none';
                  else if (loginMessageElement) loginMessageElement.style.display = 'block';
             }
+            // Garante que o botão só apareça se NÃO estiver carregando E NÃO houver erro
             if (loginButton) loginButton.style.display = (!isLoading && !isError) ? 'inline-flex' : 'none';
             if (loadingSpinner) loadingSpinner.style.display = isLoading ? 'block' : 'none';
             if (staticIcon) staticIcon.style.display = isLoading ? 'none' : 'block';
@@ -559,7 +528,6 @@
         // Espera o DOM carregar antes de inicializar Firebase
         document.addEventListener('DOMContentLoaded', () => {
             console.log("DOM Carregado. Inicializando Firebase...");
-            updateLoginUI(true, "Inicializando..."); // Mostra carregando inicial
             try {
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -568,63 +536,73 @@
                 console.log("Firebase inicializado OK.");
                 // setLogLevel('debug');
 
-                // --- INÍCIO: Lógica de Autenticação com Verificação ---
-                onAuthStateChanged(auth, async (user) => {
-                     console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null', "Email Verificado:", user ? user.emailVerified : 'N/A');
-                     authReady = true;
+                // --- INÍCIO: Lógica de Autenticação ---
+                console.log("Verificando resultado do Redirect...");
+                updateLoginUI(true, "Verificando autenticação..."); // Mantém carregando
 
-                     if (user) {
-                         // Usuário LOGADO
-                         userId = user.uid;
-                         console.log("Estado: LOGADO.", user.displayName, userId);
-                         if (userDisplayElement) {
-                            userDisplayElement.textContent = user.displayName || user.email || `Usuário ${userId.substring(0,6)}...`;
-                            userDisplayElement.title = user.email || `ID: ${userId}`;
+                getRedirectResult(auth)
+                    .then(async (result) => {
+                        authReady = true; // <-- Marca como pronto APÓS getRedirectResult
+                        console.log("getRedirectResult concluído.");
+                        if (result && result.user) {
+                            console.log("Redirect Result OBTEVE usuário:", result.user.uid);
+                            // O onAuthStateChanged (configurado abaixo) vai pegar esse usuário
+                        } else {
+                            console.log("Nenhum usuário obtido do Redirect Result.");
+                        }
+                        // Configura o listener DEPOIS de verificar o redirect
+                        setupAuthStateListener();
+                    })
+                    .catch((error) => {
+                         authReady = true; // <-- Marca como pronto mesmo com erro
+                         console.error("Erro ao verificar Redirect Result:", error.code, error.message);
+                         updateLoginUI(false, `Erro na verificação inicial: ${error.message}`, true);
+                         // Configura o listener mesmo com erro, para pegar estado logado anterior
+                         setupAuthStateListener();
+                    });
+
+                // Função que configura o listener principal
+                function setupAuthStateListener() {
+                     console.log("Configurando onAuthStateChanged listener...");
+                     onAuthStateChanged(auth, async (user) => {
+                         console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null', "AuthReady:", authReady);
+
+                         // Só age se a verificação inicial (getRedirectResult) já terminou
+                         if (!authReady) {
+                             console.log("Auth ainda não está pronta, aguardando...");
+                             return;
                          }
 
-                         // Verifica e envia email de verificação se necessário
-                         if (!user.emailVerified) {
-                             console.log("E-mail não verificado. Tentando enviar verificação...");
-                             sendEmailVerification(user)
-                                 .then(() => {
-                                     console.log("E-mail de verificação enviado (ou reenviado).");
-                                     if (emailVerificationBar) emailVerificationBar.style.display = 'block'; // Mostra a barra
-                                     if (resendStatusElement) resendStatusElement.textContent = 'E-mail enviado!';
-                                     if (resendVerificationButton) resendVerificationButton.disabled = false;
-                                 })
-                                 .catch((error) => {
-                                     console.error("Erro ao enviar e-mail de verificação:", error);
-                                     if (emailVerificationBar) emailVerificationBar.style.display = 'block'; // Mostra mesmo com erro
-                                     if (resendStatusElement) resendStatusElement.textContent = `Erro: ${error.code}`;
-                                     if (resendVerificationButton) resendVerificationButton.disabled = false;
-                                 });
+                         if (user) {
+                             // Usuário LOGADO
+                             userId = user.uid;
+                             console.log("Estado: LOGADO.", user.displayName, userId);
+                             if (userDisplayElement) {
+                                userDisplayElement.textContent = user.displayName || user.email || `Usuário ${userId.substring(0,6)}...`;
+                                userDisplayElement.title = user.email || `ID: ${userId}`;
+                             }
+
+                             if (appContainer) appContainer.style.display = 'block';
+                             if (loginContainer) loginContainer.style.display = 'none';
+                             showView(currentView);
+                             await loadSettings();
+                             loadDeliveries();
                          } else {
-                             console.log("E-mail já verificado.");
-                             if (emailVerificationBar) emailVerificationBar.style.display = 'none'; // Esconde a barra
+                             // Usuário DESLOGADO
+                             console.log("Estado: DESLOGADO.");
+                             userId = null; startingAddress = '';
+                             if (appContainer) appContainer.style.display = 'none';
+                             if (loginContainer) loginContainer.style.display = 'flex'; // MOSTRA tela de login
+                             if(firebaseInitialized) {
+                                 updateLoginUI(false, "Faça login para salvar e gerenciar suas rotas.");
+                             } else {
+                                 updateLoginUI(false, "Erro na inicialização. Recarregue.", true);
+                             }
+                             if (deliveriesUnsubscribe) { deliveriesUnsubscribe(); deliveriesUnsubscribe = null; }
+                             currentDeliveries = []; lastOptimizedRoute = [];
                          }
-
-
-                         if (appContainer) appContainer.style.display = 'block';
-                         if (loginContainer) loginContainer.style.display = 'none';
-                         showView(currentView); // Mostra a view correta
-                         await loadSettings();
-                         loadDeliveries();
-                     } else {
-                         // Usuário DESLOGADO
-                         console.log("Estado: DESLOGADO.");
-                         userId = null; startingAddress = '';
-                         if (emailVerificationBar) emailVerificationBar.style.display = 'none'; // Esconde a barra
-                         if (appContainer) appContainer.style.display = 'none';
-                         if (loginContainer) loginContainer.style.display = 'flex'; // MOSTRA tela de login
-                         if(firebaseInitialized) {
-                             updateLoginUI(false, "Faça login para salvar e gerenciar suas rotas.");
-                         } else {
-                             updateLoginUI(false, "Erro na inicialização. Recarregue.", true);
-                         }
-                         if (deliveriesUnsubscribe) { deliveriesUnsubscribe(); deliveriesUnsubscribe = null; }
-                         currentDeliveries = []; lastOptimizedRoute = [];
-                     }
-                 });
+                     });
+                 }
                 // --- FIM: Lógica de Autenticação ---
 
             } catch (initError) {
@@ -637,56 +615,19 @@
         }); // Fim do DOMContentLoaded
 
 
-        // Função de Login com Google (usa Popup)
+        // Função de Login com Google (usa Redirect)
         window.loginWithGoogle = async () => {
              if (!auth || !firebaseInitialized) return;
              const provider = new GoogleAuthProvider();
-             updateLoginUI(true, "Abrindo popup do Google..."); // Mostra carregando temporariamente
+             updateLoginUI(true, "Redirecionando para o Google...");
              if (authErrorElement) authErrorElement.style.display = 'none';
              try {
-                 const result = await signInWithPopup(auth, provider);
-                 console.log("Login com Popup bem-sucedido:", result.user);
-                 // O onAuthStateChanged vai detectar o login, verificar o email e atualizar a UI
-                 updateLoginUI(true, "Autenticado com sucesso! Carregando dados...");
+                 await signInWithRedirect(auth, provider);
              } catch (error) {
-                 console.error("Erro ao iniciar signInWithPopup:", error);
+                 console.error("Erro ao iniciar signInWithRedirect:", error);
                  updateLoginUI(false, `Erro: ${error.code} - ${error.message}`, true);
              }
          };
-
-        // Função para Reenviar Email de Verificação
-        window.resendVerificationEmail = async () => {
-            const user = auth.currentUser;
-            if (!user) {
-                console.warn("Nenhum usuário logado para reenviar verificação.");
-                return;
-            }
-            if (user.emailVerified) {
-                console.log("E-mail já está verificado.");
-                if (emailVerificationBar) emailVerificationBar.style.display = 'none';
-                return;
-            }
-
-            console.log("Tentando reenviar e-mail de verificação...");
-            if (resendVerificationButton) resendVerificationButton.disabled = true;
-            if (resendStatusElement) resendStatusElement.textContent = 'Enviando...';
-
-            try {
-                await sendEmailVerification(user);
-                console.log("E-mail de verificação reenviado.");
-                if (resendStatusElement) resendStatusElement.textContent = 'Reenviado!';
-                // Reabilita o botão após um tempo para evitar spam
-                setTimeout(() => {
-                    if (resendVerificationButton) resendVerificationButton.disabled = false;
-                    if (resendStatusElement) resendStatusElement.textContent = '';
-                }, 30000); // Espera 30 segundos
-            } catch (error) {
-                console.error("Erro ao reenviar e-mail:", error);
-                if (resendStatusElement) resendStatusElement.textContent = `Erro: ${error.code}`;
-                if (resendVerificationButton) resendVerificationButton.disabled = false; // Reabilita em caso de erro
-            }
-        };
-
 
         // Logout
         window.logout = async () => {
