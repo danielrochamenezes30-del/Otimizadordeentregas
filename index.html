@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizador de Entregas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'%3E%3Cpath fill-rule='evenodd' d='M5.478 5.558A1.5 1.5 0 0 1 6.912 4.5H9A.75.75 0 0 1 9.75 5.25v2.53A1.496 1.496 0 0 1 8.25 9H6.912a1.5 1.5 0 0 1-1.434-.942l-2.43-6a.75.75 0 0 1 .942-1.026l1.488.638ZM12.75 5.25A.75.75 0 0 0 12 6v13.5a.75.75 0 0 0 .75.75h4.5a.75.75 0 0 0 .75-.75V6a.75.75 0 0 0-.75-.75h-4.5Z' clip-rule='evenodd' /%3E%3Cpath d='m4.512 11.558 2.43 6A1.5 1.5 0 0 0 8.376 19.5H9a.75.75 0 0 0 .75-.75v-2.53a1.496 1.496 0 0 0-1.5-1.47H6.876a1.5 1.5 0 0 0-1.434.942l-2.43 6a.75.75 0 0 0 .942 1.026l1.488-.638ZM21.75 6.75A.75.75 0 0 0 21 6H19.5a.75.75 0 0 0-.75.75v13.5a.75.75 0 0 0 1.5 0V7.5H21a.75.75 0 0 0 .75-.75Z' /%3E%3C/svg%3E">
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f1f5f9; /* Slate 100 */
+            color: #1e293b; /* Slate 800 */
+            overflow-x: hidden;
+        }
+        .form-input, .cep-input, .address-search-input {
+            transition: all 0.2s ease-in-out;
+            border-radius: 0.5rem; border: 1px solid #cbd5e1; /* Slate 300 */
+            background-color: #f8fafc; /* Slate 50 */
+            color: #1e293b; /* Slate 800 */
+            padding: 0.75rem;
+        }
+        .form-input::placeholder, .cep-input::placeholder, .address-search-input::placeholder { color: #94a3b8; /* Slate 400 */ }
+        .form-input:focus, .cep-input:focus, .address-search-input:focus {
+             outline: none; border-color: #3b82f6; /* Blue 500 */
+             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); /* Ring Blue 500 */
+             background-color: #fff;
+        }
+        label { color: #475569; /* Slate 600 */}
+        .radio-label { color: #334155; /* Slate 700 */}
+        input[type="radio"] {
+             color: #3b82f6; /* blue-500 */
+             border-color: #94a3b8; /* slate-400 */
+        }
+        input[type="radio"]:focus { ring: #3b82f6; ring-offset-color: #f1f5f9;}
+        input[type="radio"]:checked { background-color: #3b82f6; border-color: #3b82f6;}
+
+        /* Estilos dos cards e botões */
+        .card {
+             background-color: #ffffff; /* White */
+             border-radius: 0.75rem;
+             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Shadow lg */
+             border: 1px solid #e2e8f0; /* Slate 200 */
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+            border-radius: 0.5rem; padding: 0.6rem 1.2rem;
+            font-weight: 600; text-align: center; display: inline-flex; /* Para alinhar ícone */
+            align-items: center; justify-content: center; gap: 0.5rem; /* Espaço entre texto e ícone */
+            cursor: pointer;
+        }
+         .btn:disabled { /* Estilo para botão desabilitado */
+             opacity: 0.5;
+             cursor: not-allowed;
+         }
+        .btn-primary { background-color: #3b82f6; color: white; } /* blue-500 bg */
+        .btn-primary:hover:not(:disabled) { background-color: #2563eb; } /* blue-600 */
+        .btn-secondary { background-color: #64748b; color: white; } /* slate-500 */
+        .btn-secondary:hover:not(:disabled) { background-color: #475569; } /* slate-600 */
+         .btn-success { background-color: #10b981; color: white; } /* emerald-500 */
+         .btn-success:hover:not(:disabled) { background-color: #059669; } /* emerald-600 */
+
+         .btn-info { background-color: #0ea5e9; color: white; } /* sky-500 */
+         .btn-info:hover:not(:disabled) { background-color: #0284c7; } /* sky-600 */
+
+        .btn-danger { background-color: #ef4444; color: white; padding: 0.3rem 0.6rem; font-size: 0.8rem; border: 1px solid #dc2626;} /* red-500 bg */
+        .btn-danger:hover:not(:disabled) { background-color: #dc2626; } /* red-600 */
+        .btn-lookup { /* Estilo Botão Buscar CEP (ambos) */
+             padding: 0.4rem 0.8rem;
+             font-size: 0.875rem; /* text-sm */
+             background-color: #10b981; /* emerald-500 */
+             color: white;
+        }
+        .btn-lookup:hover:not(:disabled) { background-color: #059669; } /* emerald-600 */
+
+        /* Botão de status */
+        .btn-toggle-status {
+            padding: 0.3rem 0.6rem; font-size: 0.8rem; min-width: 140px; /* Largura mínima */
+            background-color: #f8fafc; /* slate-50 */
+            color: #475569; /* slate-600 */
+            border: 1px solid #cbd5e1; /* slate-300 */
+        }
+        .btn-toggle-status:hover:not(:disabled) { background-color: #e2e8f0; }
+        /* Verde para Pendente */
+        .btn-toggle-status.pending { background-color: #ccfbf1; color: #0f766e; border-color: #5eead4; } /* teal */
+        .btn-toggle-status.pending:hover:not(:disabled) { background-color: #99f6e4; }
+        /* Cinza para Entregue */
+        .btn-toggle-status.delivered { background-color: #e5e7eb; color: #4b5563; border-color: #d1d5db; } /* gray */
+        .btn-toggle-status.delivered:hover:not(:disabled) { background-color: #d1d5db; }
+        /* Laranja para Não Estava em Casa */
+        .btn-toggle-status.not_home { background-color: #ffedd5; color: #9a3412; border-color: #fdba74; } /* orange */
+        .btn-toggle-status.not_home:hover:not(:disabled) { background-color: #fed7aa; }
+
+
+        /* Estilo da Rota Otimizada e Lista de Gerenciamento (compartilhado) */
+        .route-list, .management-list { list-style-type: none; margin-left: 0; padding-left: 0; } /* Remove marcadores e padding */
+        .route-list { list-style-type: decimal; margin-left: 1.5rem; } /* Adiciona marcador decimal só pra rota */
+
+        .route-list-item, .management-list-item {
+             background-color: #ffffff;
+             padding: 0.75rem 1rem;
+             border-radius: 0.75rem;
+             margin-bottom: 1rem;
+             border: 1px solid #e2e8f0; /* Slate 200 */
+             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); /* Sombra MD */
+             position: relative; /* Para posicionar o status */
+        }
+         .route-list-item p, .management-list-item p { margin: 0.1rem 0; font-size: 0.95rem; color: #334155; }
+         .route-list-item strong, .management-list-item strong {
+             color: #1e293b;
+             font-size: 1.05rem; /* Aumentado */
+         }
+
+        /* Estilos para itens com status */
+        .delivered-item {
+            opacity: 0.6;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .delivered-item strong {
+            text-decoration: line-through;
+            color: #475569; /* slate-600 */
+        }
+        .not-home-item {
+            background-color: #fffbeb; /* yellow-50 */
+            border-left: 4px solid #f59e0b; /* amber-500 */
+        }
+
+        /* Cor da distância (km) */
+        .route-distance {
+            font-size: 0.8rem;
+            color: #64748b; /* slate-500 */
+            font-weight: 500;
+            display: block; /* Para ficar abaixo do endereço */
+        }
+
+        /* Estilo da lista de entregas (Fallback - Básico) */
+        .bairro-group h3 {
+            color: #1e3a8a; /* Blue 800 */
+            border-bottom: 2px solid #dbeafe; /* Blue 100 */
+            margin-top: 1.5rem; margin-bottom: 1rem;
+            padding-bottom: 0.5rem; font-size: 1.25rem; font-weight: 600;
+        }
+        .street-group h4 {
+             font-weight: 500; color: #374151; /* gray-700 */
+             margin-top: 0.75rem; margin-bottom: 0.5rem;
+             padding-left: 0.5rem; font-size: 1rem;
+             border-left: 3px solid #60a5fa; /* blue-400 */
+        }
+        /* Delivery Item Básico usa os estilos de .management-list-item */
+        .delivery-item {
+            /* Herda de .management-list-item */
+            display: flex; /* Adiciona flex para alinhar botões */
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .size-tag {
+            padding: 0.1rem 0.5rem; border-radius: 0.25rem;
+            font-size: 0.75rem; font-weight: 500; margin-left: 0.5rem;
+        }
+        .size-grande { background-color: #fecaca; color: #991b1b; } /* red-200 bg, red-800 text */
+        .size-pequeno { background-color: #d1fae5; color: #065f46; } /* green-100 bg, green-800 text */
+
+        /* Estilos para Resultados da Busca de CEP */
+        #cep-results {
+            margin-top: 1rem; padding: 0.75rem;
+            background-color: #f8fafc; /* slate-50 */
+            border: 1px solid #e2e8f0; /* slate-200 */
+            border-radius: 0.5rem;
+            min-height: 50px; max-height: 200px;
+            overflow-y: auto;
+        }
+        #cep-results p {
+            margin-bottom: 0.5rem; padding-bottom: 0.5rem;
+            border-bottom: 1px dashed #cbd5e1; /* slate-300 */
+            font-size: 0.875rem; /* text-sm */
+        }
+        #cep-results p:last-child { border-bottom: none; margin-bottom: 0; }
+         #cep-results strong { color: #1e3a8a; /* blue-800 */ }
+
+        /* Estilo da tela de Carregando/Login */
+        #login-container {
+            min-height: 100vh;
+            display: flex; /* Mostrar por padrão */
+            align-items: center;
+            justify-content: center;
+            background-color: #f1f5f9; /* Slate 100 */
+        }
+        /* Botão Login Google */
+        #google-login-button {
+             background-color: #4285F4; /* Google Blue */
+             color: white;
+             padding: 0.75rem 1.5rem;
+             border-radius: 0.5rem;
+             font-weight: 600;
+             display: inline-flex;
+             align-items: center;
+             gap: 0.75rem;
+             transition: background-color 0.2s;
+             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #google-login-button:hover { background-color: #357ae8; }
+        #google-login-button svg { width: 1.25rem; height: 1.25rem; }
+
+
+        /* Botões de Navegação */
+        .nav-button {
+             background-color: transparent; border: none;
+             color: #dbeafe; /* blue-200 */
+             font-weight: 500; padding: 0.5rem 1rem;
+             border-radius: 0.375rem; /* rounded-md */
+             transition: all 0.2s;
+        }
+        .nav-button:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+        .nav-button.active { background-color: #ffffff; color: #2563eb; } /* bg-white, text-blue-600 */
+
+        /* Barra de Verificação de Email */
+        #email-verification-bar {
+            background-color: #fef9c3; /* yellow-100 */
+            color: #713f12; /* amber-800 */
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #fde68a; /* yellow-200 */
+            text-align: center;
+            font-size: 0.875rem; /* text-sm */
+        }
+        #email-verification-bar button {
+            margin-left: 0.5rem;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.75rem; /* text-xs */
+            background-color: #fbbf24; /* amber-400 */
+            color: #78350f; /* amber-900 */
+            border-radius: 0.375rem; /* rounded-md */
+            transition: background-color 0.2s;
+        }
+         #email-verification-bar button:hover { background-color: #f59e0b; /* amber-500 */ }
+         #email-verification-bar button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+
+        /* Override Print Styles */
+        @media print {
+            body { background-color: white !important; color: black !important; font-size: 10pt; }
+            .card { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+            h1, h2, h3, h4, strong { color: black !important; }
+            p, label, li, .radio-label { color: #333 !important; }
+            .delivery-item, .route-list-item, .management-list-item { /* Aplicado a todos */
+                 border: none !important;
+                 border-bottom: 2px solid #ddd !important;
+                 padding: 0.75rem 0.25rem !important;
+                 margin-bottom: 0.75rem !important;
+                 page-break-inside: avoid;
+            }
+             /* Estilos de impressão para status */
+             .delivered-item { opacity: 0.5 !important; background-color: #fafafa !important; }
+             .delivered-item strong { text-decoration: line-through !important; }
+             .not-home-item { background-color: #fef3c7 !important; border-left: 3px solid #d97706 !important;} /* amber */
+
+            .delivery-item p, .route-list-item p, .management-list-item p { color: black !important; font-size: 9pt !important; margin: 0 !important; }
+            .route-distance { color: #555 !important; font-size: 8pt !important; }
+            .size-tag { border: 1px solid #999; font-size: 7pt !important; padding: 0 0.2rem !important;}
+            .size-grande { background-color: #fee !important; color: #900 !important; }
+            .size-pequeno { background-color: #efe !important; color: #060 !important; }
+
+            /* Esconde elementos */
+             #add-delivery-form, #cep-search-form, header p, #print-button-container, #start-address-section, #update-route-button, #nav-buttons, #login-container, #email-verification-bar { display: none !important; } /* Esconde barra de email tbm */
+             .btn-toggle-status, .btn-danger { display: none !important; }
+             #open-maps-button { display: none !important; }
+             .failed-deliveries-title, .failed-deliveries-container { display: none !important; }
+             #user-info { display: none !important; }
+             #management-view-title { display: none !important; } /* Esconde título do Gerenciamento */
+             .management-list-item .flex { display: none !important; } /* Esconde botões no Gerenciamento */
+             .delivery-item .flex { display: none !important; } /* Esconde botões no Fallback */
+
+
+             /* Garante que a view correta seja impressa */
+             #route-view, #management-view { display: none !important; } /* Esconde ambas por padrão */
+             body.printing-route #route-view { display: block !important; }
+             body.printing-management #management-view { display: block !important; }
+
+             header { background: none !important; box-shadow: none !important; border-bottom: 2px solid black !important; padding-bottom: 0.5rem !important; margin-bottom: 0.5rem; page-break-after: avoid !important; }
+             header h1 { color: black !important; font-size: 14pt !important; }
+             main { margin-top: 0 !important; padding: 0 !important; padding-top: 0 !important; }
+             #delivery-list, #management-delivery-list { margin-top: 0 !important; }
+             .bairro-group, .street-group { page-break-inside: avoid; }
+             .route-list, .management-list { page-break-inside: avoid; padding-left: 1.5rem !important; }
+
+             .route-list li::marker { font-weight: 600 !important; font-size: 12pt !important; color: #333 !important; }
+             .route-list-item strong { font-size: 11pt !important; }
+
+             .bairro-group h3 { border-color: #aaa !important; margin-top: 1rem !important; font-size: 13pt !important; padding-top: 0.5rem !important; }
+             .street-group h4 {
+                 font-size: 11pt !important;
+                 margin: 0.5rem 0 0.2rem 0 !important;
+                 font-weight: 600 !important;
+                 border-left: 3px solid #888 !important;
+                 padding-left: 0.5rem !important;
+             }
+             .delivery-item p strong, .management-list-item p strong { font-size: 10pt !important; }
+             @page { size: A4 portrait; margin: 15mm; }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Tela de Login / Carregando -->
+    <div id="login-container"> <!-- Mostrar por padrão -->
+        <div class="card p-8 text-center max-w-sm mx-auto">
+             <div class="flex justify-center items-center gap-4 mb-4">
+                 <!-- Ícone de Carregando (pode ser escondido/trocado após verificação) -->
+                 <svg id="loading-spinner" class="h-10 w-10 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                 </svg>
+                 <!-- Ícone Estático (mostrado se não estiver carregando) -->
+                 <svg id="static-icon" class="h-10 w-10 text-blue-500" style="display: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                      <path fill-rule="evenodd" d="M5.478 5.558A1.5 1.5 0 0 1 6.912 4.5H9A.75.75 0 0 1 9.75 5.25v2.53A1.496 1.496 0 0 1 8.25 9H6.912a1.5 1.5 0 0 1-1.434-.942l-2.43-6a.75.75 0 0 1 .942-1.026l1.488.638ZM12.75 5.25A.75.75 0 0 0 12 6v13.5a.75.75 0 0 0 .75.75h4.5a.75.75 0 0 0 .75-.75V6a.75.75 0 0 0-.75-.75h-4.5Z" clip-rule="evenodd" />
+                      <path d="m4.512 11.558 2.43 6A1.5 1.5 0 0 0 8.376 19.5H9a.75.75 0 0 0 .75-.75v-2.53a1.496 1.496 0 0 0-1.5-1.47H6.876a1.5 1.5 0 0 0-1.434.942l-2.43 6a.75.75 0 0 0 .942 1.026l1.488-.638ZM21.75 6.75A.75.75 0 0 0 21 6H19.5a.75.75 0 0 0-.75.75v13.5a.75.75 0 0 0 1.5 0V7.5H21a.75.75 0 0 0 .75-.75Z" />
+                 </svg>
+                 <h1 class="text-3xl font-title text-slate-800">Organizador de Entregas</h1>
+            </div>
+            <p id="login-message" class="text-slate-600 mb-6">Verificando autenticação...</p>
+            <button id="google-login-button" onclick="loginWithGoogle()" style="display: none;"> <!-- Começa escondido -->
+                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24px" height="24px"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.712,35.945,44,30.413,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+                Entrar com Google
+            </button>
+             <p id="auth-error" class="text-red-500 text-sm mt-4" style="display: none;"></p>
+        </div>
+    </div>
+
+    <!-- Contêiner principal do aplicativo (começa escondido) -->
+    <div id="app-container" style="display: none;">
+
+        <header class="bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg pb-4 pt-12 border-b border-blue-700 relative">
+            <div class="container mx-auto px-6 text-center">
+                 <div class="flex justify-center items-center gap-4 mb-4">
+                     <svg class="h-10 w-10 text-white drop-shadow-lg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                         <path fill-rule="evenodd" d="M5.478 5.558A1.5 1.5 0 0 1 6.912 4.5H9A.75.75 0 0 1 9.75 5.25v2.53A1.496 1.496 0 0 1 8.25 9H6.912a1.5 1.5 0 0 1-1.434-.942l-2.43-6a.75.75 0 0 1 .942-1.026l1.488.638ZM12.75 5.25A.75.75 0 0 0 12 6v13.5a.75.75 0 0 0 .75.75h4.5a.75.75 0 0 0 .75-.75V6a.75.75 0 0 0-.75-.75h-4.5Z" clip-rule="evenodd" />
+                         <path d="m4.512 11.558 2.43 6A1.5 1.5 0 0 0 8.376 19.5H9a.75.75 0 0 0 .75-.75v-2.53a1.496 1.496 0 0 0-1.5-1.47H6.876a1.5 1.5 0 0 0-1.434.942l-2.43 6a.75.75 0 0 0 .942 1.026l1.488-.638ZM21.75 6.75A.75.75 0 0 0 21 6H19.5a.75.75 0 0 0-.75.75v13.5a.75.75 0 0 0 1.5 0V7.5H21a.75.75 0 0 0 .75-.75Z" />
+                     </svg>
+                    <h1 class="text-3xl md:text-4xl font-title text-white drop-shadow-md">Organizador de Entregas</h1>
+                 </div>
+                 <!-- Botões de Navegação -->
+                 <div id="nav-buttons" class="mt-6 flex justify-center gap-2">
+                     <button id="nav-route" onclick="showView('route-view')" class="nav-button active">Ver Rota Atual</button>
+                     <button id="nav-management" onclick="showView('management-view')" class="nav-button">Gerenciar Entregas</button>
+                 </div>
+            </div>
+
+             <!-- Informações do Usuário e Botão Sair -->
+            <div id="user-info" class="absolute top-4 right-6 text-white text-right">
+                <p id="user-display-name" class="text-sm font-medium truncate max-w-[200px]" title="Usuário logado"></p>
+                <button onclick="logout()" class="text-xs font-semibold text-blue-200 hover:text-white hover:underline transition-colors">
+                    Sair
+                </button>
+            </div>
+        </header>
+
+        <!-- Barra de Verificação de Email -->
+        <div id="email-verification-bar" style="display: none;">
+            <span>Seu e-mail ainda não foi verificado.</span>
+            <button id="resend-verification-button" onclick="resendVerificationEmail()">Reenviar e-mail</button>
+            <span id="resend-status" class="text-xs ml-2"></span>
+        </div>
+
+
+        <main class="container mx-auto px-6 py-8">
+            <div class="max-w-2xl mx-auto">
+
+                <!-- VISUALIZAÇÃO DA ROTA (Padrão) -->
+                <div id="route-view">
+                    <!-- Seção Endereço de Partida -->
+                    <section id="start-address-section" class="card p-6 mb-8">
+                        <h2 class="text-xl font-semibold mb-3 text-slate-800">Endereço de Partida (Base)</h2>
+                        <div class="grid grid-cols-3 gap-2 items-end mb-4">
+                             <div class="col-span-2">
+                                 <label for="start-cep" class="block text-sm font-medium mb-1">CEP (Opcional)</label>
+                                 <input type="text" id="start-cep" placeholder="Apenas números" maxlength="9" class="cep-input w-full">
+                             </div>
+                             <button id="start-cep-lookup-button" onclick="fetchBaseAddressByCEP()" class="btn btn-lookup">
+                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+                                Buscar
+                             </button>
+                        </div>
+                        <p id="start-cep-error" class="text-xs text-red-500 mb-2" style="display: none;"></p>
+                        <div>
+                             <label for="start-address" class="block text-sm font-medium mb-1">Seu endereço base (Loja/Depósito)</label>
+                             <input type="text" id="start-address" placeholder="Ex: Av. Principal, 1000, Centro, Sua Cidade - UF" class="form-input w-full">
+                             <p class="text-xs text-slate-500 mt-1">Este endereço é o ponto inicial. A rota será organizada a partir daqui.</p>
+                        </div>
+                    </section>
+
+                    <!-- Formulário de Adição -->
+                    <section id="add-delivery-form" class="card p-6 mb-8">
+                         <h2 class="text-xl font-semibold mb-4 text-slate-800">Adicionar Nova Entrega</h2>
+                         <div class="grid grid-cols-1 gap-4">
+                             <div class="grid grid-cols-3 gap-2 items-end">
+                                 <div class="col-span-2">
+                                     <label for="cep" class="block text-sm font-medium mb-1">CEP (Opcional)</label>
+                                     <input type="text" id="cep" placeholder="Apenas números" maxlength="9" class="cep-input w-full">
+                                 </div>
+                                 <button id="cep-lookup-button" onclick="fetchAddressByCEP()" class="btn btn-lookup">
+                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+                                    Buscar
+                                 </button>
+                             </div>
+                             <p id="cep-error" class="text-xs text-red-500 mt-1" style="display: none;"></p>
+                            <div>
+                                 <label for="address" class="block text-sm font-medium mb-1">Endereço Completo</label>
+                                 <input type="text" id="address" placeholder="Ex: Rua Exemplo, 123, Bairro Ex., Cidade - UF" class="form-input w-full">
+                            </div>
+                            <div>
+                                 <label for="neighborhood" class="block text-sm font-medium mb-1">Bairro</label>
+                                 <input type="text" id="neighborhood" placeholder="Ex: Bairro Exemplo" class="form-input w-full">
+                            </div>
+                            <div>
+                                 <label class="block text-sm font-medium mb-1">Tamanho do Pacote</label>
+                                 <div class="flex items-center gap-4 mt-1">
+                                     <label class="radio-label inline-flex items-center"><input type="radio" name="size" value="Pequeno" class="form-radio mr-1" checked>Pequeno</label>
+                                     <label class="radio-label inline-flex items-center"><input type="radio" name="size" value="Grande" class="form-radio mr-1">Grande</label>
+                                 </div>
+                            </div>
+                            <div class="text-right">
+                                 <button onclick="addDelivery()" class="btn btn-primary">
+                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5V4.75Z" /></svg>
+                                     Adicionar Entrega
+                                 </button>
+                            </div>
+                         </div>
+                    </section>
+
+                     <!-- Seção Busca de CEP por Endereço -->
+                     <section id="cep-search-form" class="card p-6 mb-8">
+                         <h2 class="text-xl font-semibold mb-4 text-slate-800">Buscar CEP por Endereço</h2>
+                          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                               <div><label for="search-uf" class="block text-sm font-medium mb-1">UF</label><input type="text" id="search-uf" placeholder="Ex: MG" maxlength="2" class="address-search-input w-full uppercase"></div>
+                               <div class="md:col-span-2"><label for="search-city" class="block text-sm font-medium mb-1">Cidade</label><input type="text" id="search-city" placeholder="Ex: Belo Horizonte" class="address-search-input w-full"></div>
+                          </div>
+                         <div><label for="search-street" class="block text-sm font-medium mb-1">Logradouro</label><input type="text" id="search-street" placeholder="Mínimo 3 caracteres" class="address-search-input w-full"></div>
+                          <div class="text-right mt-4">
+                               <button id="search-cep-button" onclick="searchCEPsByAddress()" class="btn btn-lookup">
+                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
+                                   Buscar CEPs
+                               </button>
+                          </div>
+                          <div id="cep-results" class="mt-4" style="display: none;"></div>
+                     </section>
+
+                    <!-- Lista da Rota Otimizada -->
+                    <section id="delivery-list-section" class="card p-6">
+                         <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h2 class="text-xl font-semibold text-slate-800">Rota de Entregas</h2>
+                            <div id="print-button-container" class="flex gap-2">
+                                <button id="update-route-button" onclick="runOptimization()" class="btn btn-success"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.208-4.068 3.5 3.5 0 0 1 5.572-2.316l.24.215a.75.75 0 0 1-.98 1.132l-.24-.215a2 2 0 0 0-3.184 1.323A4 4 0 0 0 12.6 12.2a.75.75 0 0 1 1.29.74l-.123.245a.75.75 0 0 1-1.02.44A5.49 5.49 0 0 1 11 11.25a.75.75 0 0 1 .75-.75h.75a.75.75 0 0 1 .75.75 4.008 4.008 0 0 0 1.938 3.424A.75.75 0 0 1 14.25 16h-3.5a.75.75 0 0 1-.75-.75v-2.25a.75.75 0 0 1 1.5 0v.75h1.696a5.503 5.503 0 0 1-.884-1.876Z" clip-rule="evenodd" /><path d="M8.75 3.5a.75.75 0 0 0-1.5 0v2.25a.75.75 0 0 0 1.5 0V3.5Z" /><path d="M5.75 7.75a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75Z" /></svg>Otimizar Rota</button>
+                                <button onclick="printList('route')" class="btn btn-secondary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5 2.75C5 1.784 5.784 1 6.75 1h6.5c.966 0 1.75.784 1.75 1.75v3.58c.296.098.583.226.852.381.54.308.996.726 1.348 1.238A6 6 0 0 1 18 13.75v1.516A2.75 2.75 0 0 1 15.25 18h-2.5a.75.75 0 0 1 0-1.5h2.5a1.25 1.25 0 0 0 1.25-1.25v-1.516a4.5 4.5 0 0 0-1.077-2.903 4.478 4.478 0 0 0-1.206-.884.75.75 0 0 1-.367-.655V3.75a1.25 1.25 0 0 0-1.25-1.25h-5.5A1.25 1.25 0 0 0 5 3.75v5.002a.75.75 0 0 1-.367.655 4.478 4.478 0 0 0-1.206.884A4.5 4.5 0 0 0 2 13.734V15.25A1.25 1.25 0 0 0 3.25 16.5h2.5a.75.75 0 0 1 0 1.5h-2.5A2.75 2.75 0 0 1 .5 15.25v-1.516a6 6 0 0 1 .798-3.031c.352-.512.808-.93 1.348-1.238.27-.155.556-.283.852-.381V2.75ZM6.5 4.25a.75.75 0 0 0 0 1.5h7a.75.75 0 0 0 0-1.5h-7Z" clip-rule="evenodd" /><path d="M7.5 10a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0ZM10 8.25a.75.75 0 0 0-.75.75v2.25H8a.75.75 0 0 0 0 1.5h1.25v.75a.75.75 0 0 0 1.5 0v-.75H12a.75.75 0 0 0 0-1.5h-1.25V9a.75.75 0 0 0-.75-.75Z" /></svg>Imprimir Lista</button>
+                                <button id="open-maps-button" onclick="openGoogleMaps()" class="btn btn-info" style="display: none;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="m9.58 1.087.02-.003.02.003c.094.02 1.804.464 3.42 1.44a.75.75 0 0 1 .238.214l.004.005.003.004a.75.75 0 0 1 .18.337c.384 1.28.513 2.68.39 4.111l-.013.15a.75.75 0 0 1-.223.47l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1-.223-.47l-.013-.15c-.123-1.432 0-2.83.39-4.112a.75.75 0 0 1 .18-.336l.003-.004.004-.005a.75.75 0 0 1 .238-.214c1.616-.976 3.326-1.42 3.42-1.44Zm-.37 6.208a.75.75 0 0 1 .68 0l2.25 1.125a.75.75 0 0 1 0 1.348l-2.25 1.125a.75.75 0 0 1-.68 0L7.003 9.77a.75.75 0 0 1 0-1.348l2.208-1.103Z" clip-rule="evenodd" /><path d="M11.5 13.59a.75.75 0 0 1 .53 1.28l-2.25 2.25a.75.75 0 0 1-1.06 0l-2.25-2.25a.75.75 0 1 1 1.06-1.06l1.72 1.72 1.72-1.72a.75.75 0 0 1 .53-.22Z" /></svg>Abrir no Maps</button>
+                            </div>
+                        </div>
+                         <p id="route-status" class="text-sm text-slate-500 mb-3" style="display: none;"></p>
+                        <div id="delivery-list">
+                            <p class="text-slate-500 text-center">Nenhuma entrega adicionada ainda.</p>
+                        </div>
+                        <!-- Lista de Falhas (movida para dentro da função render) -->
+                    </section>
+                </div>
+
+                <!-- VISUALIZAÇÃO DE GERENCIAMENTO (Escondida por padrão) -->
+                 <div id="management-view" style="display: none;">
+                    <section class="card p-6">
+                         <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h2 id="management-view-title" class="text-xl font-semibold text-slate-800">Gerenciar Todas as Entregas</h2>
+                            <button onclick="printList('management')" class="btn btn-secondary"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M5 2.75C5 1.784 5.784 1 6.75 1h6.5c.966 0 1.75.784 1.75 1.75v3.58c.296.098.583.226.852.381.54.308.996.726 1.348 1.238A6 6 0 0 1 18 13.75v1.516A2.75 2.75 0 0 1 15.25 18h-2.5a.75.75 0 0 1 0-1.5h2.5a1.25 1.25 0 0 0 1.25-1.25v-1.516a4.5 4.5 0 0 0-1.077-2.903 4.478 4.478 0 0 0-1.206-.884.75.75 0 0 1-.367-.655V3.75a1.25 1.25 0 0 0-1.25-1.25h-5.5A1.25 1.25 0 0 0 5 3.75v5.002a.75.75 0 0 1-.367.655 4.478 4.478 0 0 0-1.206.884A4.5 4.5 0 0 0 2 13.734V15.25A1.25 1.25 0 0 0 3.25 16.5h2.5a.75.75 0 0 1 0 1.5h-2.5A2.75 2.75 0 0 1 .5 15.25v-1.516a6 6 0 0 1 .798-3.031c.352-.512.808-.93 1.348-1.238.27-.155.556-.283.852-.381V2.75ZM6.5 4.25a.75.75 0 0 0 0 1.5h7a.75.75 0 0 0 0-1.5h-7Z" clip-rule="evenodd" /><path d="M7.5 10a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0ZM10 8.25a.75.75 0 0 0-.75.75v2.25H8a.75.75 0 0 0 0 1.5h1.25v.75a.75.75 0 0 0 1.5 0v-.75H12a.75.75 0 0 0 0-1.5h-1.25V9a.75.75 0 0 0-.75-.75Z" /></svg>Imprimir Gerenciamento</button>
+                         </div>
+                         <p class="text-sm text-slate-500 mb-4">Visualize e atualize o status de todas as suas entregas salvas.</p>
+                        <div id="management-delivery-list" class="management-list">
+                            <p class="text-slate-500 text-center">Carregando entregas...</p>
+                        </div>
+                    </section>
+                </div>
+
+            </div>
+        </main>
+    </div> <!-- Fim do #app-container -->
+
+
+    <!-- Firebase -->
+    <script type="module">
+        // Importações
+        import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import {
+            getAuth,
+            onAuthStateChanged,
+            signInWithPopup,
+            GoogleAuthProvider,
+            signOut,
+            sendEmailVerification // <-- Importado
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import {
+            getFirestore, collection, addDoc, onSnapshot, query, deleteDoc,
+            doc, Timestamp, setDoc, getDoc, updateDoc, orderBy
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Variáveis Globais
+        let app;
+        let db;
+        let auth;
+        let userId;
+        let deliveriesUnsubscribe = null;
+        let currentDeliveries = [];
+        let startingAddress = '';
+        let lastOptimizedRoute = [];
+        let currentView = 'route-view';
+        let authReady = false;
+
+        // Elementos DOM
+        const loginContainer = document.getElementById('login-container');
+        const appContainer = document.getElementById('app-container');
+        const userDisplayElement = document.getElementById('user-display-name');
+        const authErrorElement = document.getElementById('auth-error');
+        const loginMessageElement = document.getElementById('login-message');
+        const loginButton = document.getElementById('google-login-button');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const staticIcon = document.getElementById('static-icon');
+        const emailVerificationBar = document.getElementById('email-verification-bar'); // <-- Novo
+        const resendVerificationButton = document.getElementById('resend-verification-button'); // <-- Novo
+        const resendStatusElement = document.getElementById('resend-status'); // <-- Novo
+
+
+        // Configuração Firebase (Sua Configuração)
+        const firebaseConfig = {
+          apiKey: "AIzaSyCmskiIAKHmyfw1FapQzQsK1I7GzXgdVcc",
+          authDomain: "otimizadorderotas-4ecad.firebaseapp.com",
+          projectId: "otimizadorderotas-4ecad",
+          storageBucket: "otimizadorderotas-4ecad.appspot.com",
+          messagingSenderId: "19873425863",
+          appId: "1:19873425863:web:817b4ff574200bbf7751e2",
+          measurementId: "G-9Z7YT0DYCE"
+        };
+
+        let firebaseInitialized = false;
+
+        // Função para atualizar UI de login/loading
+        function updateLoginUI(isLoading, message, isError = false) {
+             console.log(`[UI Update] isLoading=${isLoading}, message=${message}, isError=${isError}`);
+            if (loginMessageElement) loginMessageElement.textContent = message;
+            if (authErrorElement) {
+                authErrorElement.textContent = isError ? message : '';
+                authErrorElement.style.display = isError ? 'block' : 'none';
+                if(isError && loginMessageElement) loginMessageElement.style.display = 'none';
+                 else if (loginMessageElement) loginMessageElement.style.display = 'block';
+            }
+            if (loginButton) loginButton.style.display = (!isLoading && !isError) ? 'inline-flex' : 'none';
+            if (loadingSpinner) loadingSpinner.style.display = isLoading ? 'block' : 'none';
+            if (staticIcon) staticIcon.style.display = isLoading ? 'none' : 'block';
+        }
+
+        // Espera o DOM carregar antes de inicializar Firebase
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM Carregado. Inicializando Firebase...");
+            updateLoginUI(true, "Inicializando..."); // Mostra carregando inicial
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                firebaseInitialized = true;
+                console.log("Firebase inicializado OK.");
+                // setLogLevel('debug');
+
+                // --- INÍCIO: Lógica de Autenticação com Verificação ---
+                onAuthStateChanged(auth, async (user) => {
+                     console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null', "Email Verificado:", user ? user.emailVerified : 'N/A');
+                     authReady = true;
+
+                     if (user) {
+                         // Usuário LOGADO
+                         userId = user.uid;
+                         console.log("Estado: LOGADO.", user.displayName, userId);
+                         if (userDisplayElement) {
+                            userDisplayElement.textContent = user.displayName || user.email || `Usuário ${userId.substring(0,6)}...`;
+                            userDisplayElement.title = user.email || `ID: ${userId}`;
+                         }
+
+                         // Verifica e envia email de verificação se necessário
+                         if (!user.emailVerified) {
+                             console.log("E-mail não verificado. Tentando enviar verificação...");
+                             sendEmailVerification(user)
+                                 .then(() => {
+                                     console.log("E-mail de verificação enviado (ou reenviado).");
+                                     if (emailVerificationBar) emailVerificationBar.style.display = 'block'; // Mostra a barra
+                                     if (resendStatusElement) resendStatusElement.textContent = 'E-mail enviado!';
+                                     if (resendVerificationButton) resendVerificationButton.disabled = false;
+                                 })
+                                 .catch((error) => {
+                                     console.error("Erro ao enviar e-mail de verificação:", error);
+                                     if (emailVerificationBar) emailVerificationBar.style.display = 'block'; // Mostra mesmo com erro
+                                     if (resendStatusElement) resendStatusElement.textContent = `Erro: ${error.code}`;
+                                     if (resendVerificationButton) resendVerificationButton.disabled = false;
+                                 });
+                         } else {
+                             console.log("E-mail já verificado.");
+                             if (emailVerificationBar) emailVerificationBar.style.display = 'none'; // Esconde a barra
+                         }
+
+
+                         if (appContainer) appContainer.style.display = 'block';
+                         if (loginContainer) loginContainer.style.display = 'none';
+                         showView(currentView); // Mostra a view correta
+                         await loadSettings();
+                         loadDeliveries();
+                     } else {
+                         // Usuário DESLOGADO
+                         console.log("Estado: DESLOGADO.");
+                         userId = null; startingAddress = '';
+                         if (emailVerificationBar) emailVerificationBar.style.display = 'none'; // Esconde a barra
+                         if (appContainer) appContainer.style.display = 'none';
+                         if (loginContainer) loginContainer.style.display = 'flex'; // MOSTRA tela de login
+                         if(firebaseInitialized) {
+                             updateLoginUI(false, "Faça login para salvar e gerenciar suas rotas.");
+                         } else {
+                             updateLoginUI(false, "Erro na inicialização. Recarregue.", true);
+                         }
+                         if (deliveriesUnsubscribe) { deliveriesUnsubscribe(); deliveriesUnsubscribe = null; }
+                         currentDeliveries = []; lastOptimizedRoute = [];
+                     }
+                 });
+                // --- FIM: Lógica de Autenticação ---
+
+            } catch (initError) {
+                 console.error("Erro CRÍTICO ao inicializar Firebase:", initError);
+                 updateLoginUI(false, `Erro Crítico: ${initError.message}. Verifique a config.`, true);
+                 if (appContainer) appContainer.style.display = 'none';
+                 if (loginContainer) loginContainer.style.display = 'flex';
+                 firebaseInitialized = false;
+            }
+        }); // Fim do DOMContentLoaded
+
+
+        // Função de Login com Google (usa Popup)
+        window.loginWithGoogle = async () => {
+             if (!auth || !firebaseInitialized) return;
+             const provider = new GoogleAuthProvider();
+             updateLoginUI(true, "Abrindo popup do Google..."); // Mostra carregando temporariamente
+             if (authErrorElement) authErrorElement.style.display = 'none';
+             try {
+                 const result = await signInWithPopup(auth, provider);
+                 console.log("Login com Popup bem-sucedido:", result.user);
+                 // O onAuthStateChanged vai detectar o login, verificar o email e atualizar a UI
+                 updateLoginUI(true, "Autenticado com sucesso! Carregando dados...");
+             } catch (error) {
+                 console.error("Erro ao iniciar signInWithPopup:", error);
+                 updateLoginUI(false, `Erro: ${error.code} - ${error.message}`, true);
+             }
+         };
+
+        // Função para Reenviar Email de Verificação
+        window.resendVerificationEmail = async () => {
+            const user = auth.currentUser;
+            if (!user) {
+                console.warn("Nenhum usuário logado para reenviar verificação.");
+                return;
+            }
+            if (user.emailVerified) {
+                console.log("E-mail já está verificado.");
+                if (emailVerificationBar) emailVerificationBar.style.display = 'none';
+                return;
+            }
+
+            console.log("Tentando reenviar e-mail de verificação...");
+            if (resendVerificationButton) resendVerificationButton.disabled = true;
+            if (resendStatusElement) resendStatusElement.textContent = 'Enviando...';
+
+            try {
+                await sendEmailVerification(user);
+                console.log("E-mail de verificação reenviado.");
+                if (resendStatusElement) resendStatusElement.textContent = 'Reenviado!';
+                // Reabilita o botão após um tempo para evitar spam
+                setTimeout(() => {
+                    if (resendVerificationButton) resendVerificationButton.disabled = false;
+                    if (resendStatusElement) resendStatusElement.textContent = '';
+                }, 30000); // Espera 30 segundos
+            } catch (error) {
+                console.error("Erro ao reenviar e-mail:", error);
+                if (resendStatusElement) resendStatusElement.textContent = `Erro: ${error.code}`;
+                if (resendVerificationButton) resendVerificationButton.disabled = false; // Reabilita em caso de erro
+            }
+        };
+
+
+        // Logout
+        window.logout = async () => {
+            if (!auth || !firebaseInitialized) return;
+            try { await signOut(auth); } catch (error) { console.error("Erro ao sair:", error); }
+        };
+
+        // --- Controle de Visualização ---
+        window.showView = (viewId) => {
+             // ... (código igual ao anterior) ...
+             console.log("Mudando para view:", viewId);
+             currentView = viewId;
+             const routeV = document.getElementById('route-view');
+             const mgmtV = document.getElementById('management-view');
+             if (routeV) routeV.style.display = 'none';
+             if (mgmtV) mgmtV.style.display = 'none';
+
+             const targetView = document.getElementById(viewId);
+             if (targetView) targetView.style.display = 'block';
+
+             // Atualiza botões
+             const navRoute = document.getElementById('nav-route');
+             const navMgmt = document.getElementById('nav-management');
+             if (navRoute) navRoute.classList.toggle('active', viewId === 'route-view');
+             if (navMgmt) navMgmt.classList.toggle('active', viewId === 'management-view');
+
+             // Renderiza lista apropriada
+             if (viewId === 'management-view') {
+                 renderManagementList(currentDeliveries);
+             } else if (firebaseInitialized) {
+                 optimizeAndRenderRoutes(currentDeliveries, true);
+             }
+         };
+
+        // --- Funções Firebase (com verificações) ---
+        // (código igual ao anterior)
+        function getFirestoreCollection(collectionName) {
+             if (!userId || !db) {
+                 console.warn(`Firestore não disponível ou usuário não logado para acessar coleção: ${collectionName}`);
+                 return null;
+             }
+             return collection(db, `users/${userId}/${collectionName}`);
+        }
+        function getFirestoreDoc(collectionName, docId) {
+             const collRef = getFirestoreCollection(collectionName);
+             if (!collRef || !docId) return null;
+             return doc(collRef, docId);
+        }
+        function getSettingsDocRef() {
+            if (!userId || !db) return null;
+            return doc(db, `users/${userId}/config/appSettings`);
+        }
+        async function saveSettings(settingsData) {
+            const docRef = getSettingsDocRef();
+            if (!docRef) { console.warn("Não foi possível salvar config: Ref nula."); return; }
+            try {
+                await setDoc(docRef, settingsData, { merge: true });
+                console.log("Settings saved:", settingsData);
+                if (settingsData.startingAddress !== undefined) startingAddress = settingsData.startingAddress;
+            } catch (error) { console.error("Error saving settings:", error); }
+        }
+        async function loadSettings() {
+             const docRef = getSettingsDocRef();
+             if (!docRef) { console.warn("Não foi possível carregar config: Ref nula."); return; }
+             try {
+                const docSnap = await getDoc(docRef);
+                const addressInput = document.getElementById('start-address');
+                if (docSnap.exists()) {
+                    const settings = docSnap.data();
+                    startingAddress = settings.startingAddress || '';
+                    if (addressInput) addressInput.value = startingAddress;
+                } else {
+                    startingAddress = '';
+                    if (addressInput) addressInput.value = '';
+                }
+             } catch (error) {
+                 console.error("Error loading settings:", error);
+                 startingAddress = '';
+                 const addressInput = document.getElementById('start-address');
+                 if (addressInput) addressInput.value = '';
+             }
+        }
+        window.addDelivery = function() {
+             const collRef = getFirestoreCollection('deliveries');
+             const cepErrorEl = document.getElementById('cep-error');
+             if (!collRef) { /* ... mostrar erro ... */ return; }
+             const addressInput = document.getElementById('address');
+             const neighborhoodInput = document.getElementById('neighborhood');
+             const sizeInput = document.querySelector('input[name="size"]:checked');
+             const cepInput = document.getElementById('cep');
+             const address = addressInput.value.trim();
+             const neighborhood = neighborhoodInput.value.trim();
+             const size = sizeInput ? sizeInput.value : 'Pequeno';
+             const cep = cepInput.value.replace(/\D/g, '');
+             if (!address || !neighborhood) { /* ... mostrar erro ... */ return; }
+             const newDelivery = { address, neighborhood, size, cep: cep || null, createdAt: Timestamp.now(), status: 'pending' };
+
+             addDoc(collRef, newDelivery)
+                .then(() => { /* ... limpar campos ... */ })
+                .catch(error => { /* ... mostrar erro ... */ });
+        }
+        function loadDeliveries() {
+            const collRef = getFirestoreCollection('deliveries');
+            if (!collRef) { renderRouteList([], true, {}); renderManagementList([]); return; }
+            if (deliveriesUnsubscribe) deliveriesUnsubscribe();
+            const q = query(collRef, orderBy("createdAt", "desc"));
+            deliveriesUnsubscribe = onSnapshot(q, (querySnapshot) => {
+                currentDeliveries = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (currentView === 'management-view') {
+                    renderManagementList(currentDeliveries);
+                } else {
+                     optimizeAndRenderRoutes(currentDeliveries, true);
+                }
+            }, (error) => { /* ... tratar erro ... */ });
+        }
+        window.toggleDeliveryStatus = async (deliveryId, currentStatus) => {
+            const docRef = getFirestoreDoc('deliveries', deliveryId);
+            if (!docRef) return;
+             let newStatus;
+             if (currentStatus === 'pending') newStatus = 'delivered';
+             else if (currentStatus === 'delivered') newStatus = 'not_home';
+             else newStatus = 'pending';
+            try { await updateDoc(docRef, { status: newStatus }); }
+            catch (error) { /* ... tratar erro ... */ }
+        };
+        window.deleteDelivery = function(deliveryId) {
+             const docRef = getFirestoreDoc('deliveries', deliveryId);
+             if (!docRef) return;
+             deleteDoc(docRef)
+                 .then(() => console.log("Excluído:", deliveryId))
+                 .catch(error => { /* ... tratar erro ... */ });
+        };
+
+        // --- Otimização, Busca CEP, Renderização, etc ---
+        // (Código restante igual ao anterior)
+        window.runOptimization = async function(isInitialLoad = false) { /* ... */ }
+        async function optimizeAndRenderRoutes(allDeliveries, isInitialLoad = false, currentStartAddress = null) { /* ... */ }
+        window.fetchAddressByCEP = async function() { /* ... */ }
+        window.searchCEPsByAddress = async function() { /* ... */ }
+        window.fetchBaseAddressByCEP = async function() { /* ... */ }
+        function getHaversineDistance(coords1, coords2) { /* ... */ }
+        function basicSortDeliveries(deliveries) { /* ... */ }
+        function renderRouteList(deliveries, isBasicSort, failedDeliveries) { /* ... */ }
+        function renderManagementList(allDeliveries) { /* ... */ }
+        function renderOptimizedList(listElement, deliveries) { /* ... */ }
+        function renderBasicGroup(listElement, groupedDeliveries, context) { /* ... */ }
+        function renderFailedList(listElement, failedDeliveries) { /* ... */ }
+        function renderGenericDeliveryItem(parentElement, delivery, context, streetNameIfBasic = null) { /* ... */ }
+        function handleConfirmDelete(buttonElement, deliveryId) { /* ... */ }
+        window.openGoogleMaps = function() { /* ... */ }
+        window.printList = (context) => { /* ... */ };
+
+    </script>
+</body>
+</html>
+
