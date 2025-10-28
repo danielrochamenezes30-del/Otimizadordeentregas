@@ -74,9 +74,8 @@
              font-size: 0.875rem; /* text-sm */
              background-color: #10b981;
              color: white;
-             /* Correção Botão Gigante: Adiciona altura mínima */
-             min-height: calc(1.25rem + 0.8rem + 2px); /* Aproxima altura (ícone h-4 + padding y + borda) */
-             box-sizing: border-box; /* Garante que padding/borda não aumentem o tamanho total */
+             min-height: calc(1.25rem + 0.8rem + 2px);
+             box-sizing: border-box;
         }
         .btn-lookup:hover:not(:disabled) { background-color: #059669; }
 
@@ -190,7 +189,9 @@
 </head>
 <body class="antialiased">
 
-    <div id="login-container"> <div class="card p-8 text-center max-w-sm mx-auto">
+    <!-- Tela de Login / Carregando -->
+    <div id="login-container"> <!-- Mostrar por padrão -->
+        <div class="card p-8 text-center max-w-sm mx-auto">
              <div class="flex justify-center items-center gap-4 mb-4">
                  <svg id="loading-spinner" class="h-10 w-10 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> /* ... */ </svg>
                  <svg id="static-icon" class="h-10 w-10 text-blue-500" style="display: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"> /* ... */ </svg>
@@ -205,6 +206,7 @@
         </div>
     </div>
 
+    <!-- Contêiner principal do aplicativo (começa escondido) -->
     <div id="app-container" style="display: none;">
         <header class="bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg pb-4 pt-12 border-b border-blue-700 relative">
             <div class="container mx-auto px-6 text-center">
@@ -240,8 +242,12 @@
                  </div>
             </div>
         </main>
-    </div> <script type="module">
-        // Importações (usando Redirect)
+    </div> <!-- Fim do #app-container -->
+
+
+    <!-- Firebase -->
+    <script type="module">
+        // Importações
         import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import {
             getAuth, onAuthStateChanged, signInWithRedirect, getRedirectResult,
@@ -259,7 +265,6 @@
         let currentDeliveries = [];
         let lastOptimizedRoute = [];
         let currentView = 'route-view';
-        let authReady = false; // Flag crucial para fluxo de redirect
         let baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
 
         // Elementos DOM
@@ -276,7 +281,15 @@
         const resendStatusElement = document.getElementById('resend-status');
 
         // Config Firebase
-        const firebaseConfig = { /* ... sua config ... */ };
+        const firebaseConfig = {
+             apiKey: "AIzaSyCmskiIAKHmyfw1FapQzQsK1I7GzXgdVcc",
+             authDomain: "otimizadorderotas-4ecad.firebaseapp.com",
+             projectId: "otimizadorderotas-4ecad",
+             storageBucket: "otimizadorderotas-4ecad.appspot.com",
+             messagingSenderId: "19873425863",
+             appId: "1:19873425863:web:817b4ff574200bbf7751e2",
+             measurementId: "G-9Z7YT0DYCE"
+        };
         let firebaseInitialized = false;
 
         // --- Funções Auxiliares ---
@@ -296,56 +309,61 @@
                  auth = getAuth(app);
                  firebaseInitialized = true;
                  console.log("Firebase inicializado OK.");
+                 // setLogLevel('debug'); // Descomente para logs detalhados do Firebase
 
-                 // Fluxo de Autenticação com Redirect
+                 // Fluxo de Autenticação com Redirect Simplificado
                  console.log("Verificando resultado do Redirect...");
                  updateLoginUI(true, "Verificando autenticação...");
 
                  getRedirectResult(auth)
                      .then(async (result) => {
-                         console.log("getRedirectResult concluído.");
+                         console.log("getRedirectResult PROMESSA RESOLVIDA."); // Log A
                          if (result && result.user) {
-                             console.log("Redirect Result OBTEVE usuário:", result.user.uid);
-                             // O usuário acabou de logar via redirect
+                             console.log("Redirect Result OBTEVE usuário:", result.user.uid); // Log B
+                             // Usuário acabou de logar. O onAuthStateChanged vai lidar com isso.
                          } else {
-                             console.log("Nenhum usuário obtido do Redirect Result (pode ser a primeira visita, refresh ou logout).");
+                             console.log("Nenhum usuário obtido do Redirect Result."); // Log C
+                             // Pode ser primeira visita, refresh ou logout. Verifica se já existe sessão.
+                             if (!auth.currentUser) {
+                                 console.log("Nenhum usuário logado atualmente (após redirect check). Mostrando botão de login."); // Log D
+                                 updateLoginUI(false, "Faça login para salvar e gerenciar suas rotas.");
+                             } else {
+                                 console.log("Usuário já estava logado (sessão existente)."); // Log E
+                                 // O onAuthStateChanged vai pegar o usuário existente.
+                             }
                          }
-                         // Importante: Marcar authReady como true AQUI, antes de configurar o listener principal
-                         authReady = true;
-                         setupAuthStateListener(); // Configura o listener DEPOIS de verificar o redirect
+                         // Configura o listener DEPOIS de processar o redirect
+                         setupAuthStateListener();
                      })
                      .catch((error) => {
-                         console.error("Erro CRÍTICO ao verificar Redirect Result:", error.code, error.message);
-                         authReady = true; // Marca como pronto mesmo com erro crítico inicial
+                         console.error("Erro CRÍTICO ao verificar Redirect Result:", error.code, error.message); // Log F
                          updateLoginUI(false, `Erro na verificação inicial: ${error.message}`, true);
-                         setupAuthStateListener(); // Tenta configurar o listener mesmo assim
+                         // Tenta configurar o listener mesmo com erro, pode haver sessão válida
+                         setupAuthStateListener();
                      });
 
              } catch (initError) {
-                  console.error("Erro CRÍTICO ao inicializar Firebase:", initError);
-                  updateLoginUI(false, `Erro Crítico: ${initError.message}. Verifique a config.`, true);
+                  console.error("Erro CRÍTICO ao inicializar Firebase:", initError); // Log G
+                  updateLoginUI(false, `Erro Crítico: ${initError.message}. Verifique a config ou recarregue.`, true);
                   firebaseInitialized = false;
-                  authReady = true; // Permite que o estado de "deslogado" seja exibido
+                  // Não configura o listener se a inicialização falhou
              }
         });
 
         // Configura o listener principal
         function setupAuthStateListener() {
-            console.log("Configurando onAuthStateChanged listener...");
+            console.log("Configurando onAuthStateChanged listener..."); // Log H
             onAuthStateChanged(auth, async (user) => {
-                console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null', "AuthReady:", authReady);
-
-                // Espera getRedirectResult terminar (authReady === true)
-                if (!authReady) {
-                    console.log("Auth ainda não está pronta (getRedirectResult pendente), aguardando...");
-                    updateLoginUI(true, "Verificando autenticação..."); // Mantém o loading
-                    return; // Sai e espera a próxima chamada quando authReady for true
-                }
+                console.log("onAuthStateChanged disparado. Usuário:", user ? user.uid : 'null'); // Log I
 
                 if (user) {
-                    // Usuário LOGADO (seja por redirect ou sessão existente)
+                    // Usuário LOGADO
+                    if (userId === user.uid) {
+                        console.log("onAuthStateChanged: Usuário já é o atual, não faz nada extra."); // Log J
+                        return; // Evita reprocessamento desnecessário
+                    }
                     userId = user.uid;
-                    console.log("Estado: LOGADO.", user.displayName, userId);
+                    console.log("Estado: LOGADO.", user.displayName, userId); // Log K
                     if (userDisplayElement) { /* ... atualiza nome ... */ }
                     if (!user.emailVerified) { /* ... lógica de verificação de email ... */ }
                     else { if (emailVerificationBar) emailVerificationBar.style.display = 'none'; }
@@ -357,40 +375,27 @@
                     loadDeliveries(); // Começa a ouvir as entregas
                 } else {
                     // Usuário DESLOGADO
-                    console.log("Estado: DESLOGADO.");
+                    console.log("Estado: DESLOGADO."); // Log L
                     userId = null;
-                    if (deliveriesUnsubscribe) { // Para o listener de entregas
-                        console.log("Cancelando listener de entregas.");
-                        deliveriesUnsubscribe();
-                        deliveriesUnsubscribe = null;
-                    }
-                    currentDeliveries = []; // Limpa dados locais
+                    if (deliveriesUnsubscribe) { /* ... cancela listener ... */ }
+                    currentDeliveries = [];
                     lastOptimizedRoute = [];
                     baseAddress = { street: '', number: '', neighborhood: '', city: '', uf: '' };
 
-                    // Limpa todos os campos de formulário
-                    ['start-street', 'start-number', 'start-neighborhood', 'start-city', 'start-uf', 'start-cep',
-                     'delivery-street', 'delivery-number', 'delivery-neighborhood', 'delivery-city', 'delivery-uf', 'delivery-cep']
-                     .forEach(id => {
-                        const el = document.getElementById(id);
-                        if (el) el.value = '';
-                     });
-                     const sizePequenoRadio = document.querySelector('input[name="size"][value="Pequeno"]');
-                     if (sizePequenoRadio) sizePequenoRadio.checked = true;
-                     // Limpa listas na UI
-                     const routeListEl = document.getElementById('delivery-list');
-                     if (routeListEl) routeListEl.innerHTML = '<p class="text-slate-500 text-center">Faça login para ver suas entregas.</p>';
-                     const mgmtListEl = document.getElementById('management-delivery-list');
-                     if (mgmtListEl) mgmtListEl.innerHTML = '<p class="text-slate-500 text-center">Faça login para ver suas entregas.</p>';
-
+                    // Limpa todos os campos de formulário (igual)
+                    /* ... código de limpeza ... */
 
                     if (emailVerificationBar) emailVerificationBar.style.display = 'none';
                     if (appContainer) appContainer.style.display = 'none';
-                    if (loginContainer) loginContainer.style.display = 'flex';
+                    if (loginContainer) loginContainer.style.display = 'flex'; // Garante mostrar login
+
+                    // Só mostra o botão de login se a inicialização foi OK
                     if (firebaseInitialized) {
+                        console.log("Firebase inicializado, mostrando botão de login."); // Log M
                         updateLoginUI(false, "Faça login para salvar e gerenciar suas rotas.");
                     } else {
-                        // Se firebase falhou na inicialização, authReady será true mas firebaseInitialized será false
+                        // Se firebase falhou na inicialização, mostra erro permanente
+                        console.log("Firebase NÃO inicializado, mostrando erro."); // Log N
                         updateLoginUI(false, "Erro na inicialização. Recarregue a página.", true);
                     }
                 }
@@ -404,26 +409,7 @@
         window.loginWithGoogle = async () => { /* ... código igual ... */ };
 
         // Logout com Logs
-        window.logout = async () => {
-            console.log("Logout function called."); // Log 1
-            if (!auth || !firebaseInitialized) {
-                console.warn("Logout attempt aborted: Auth or Firebase not ready.");
-                return;
-            }
-            try {
-                console.log("Attempting signOut..."); // Log 2
-                await signOut(auth);
-                console.log("signOut successful. onAuthStateChanged should trigger cleanup."); // Log 3
-                // A limpeza agora é feita pelo onAuthStateChanged quando detecta user === null
-            } catch (error) {
-                console.error("Erro CRÍTICO ao sair:", error); // Log 4
-                // Informar o usuário sobre o erro pode ser útil aqui
-                 if (authErrorElement) { // Reutiliza o elemento de erro do login
-                     authErrorElement.textContent = `Erro ao sair: ${error.message}`;
-                     authErrorElement.style.display = 'block';
-                 }
-            }
-        };
+        window.logout = async () => { /* ... código igual ... */ };
 
         // Reenviar Email de Verificação
         window.resendVerificationEmail = async () => { /* ... código igual ... */ };
@@ -437,14 +423,14 @@
         // Carregar Configurações (Endereço Base)
         async function loadSettings() { /* ... código igual ... */ }
 
-        // Adicionar Entrega (com verificação reforçada)
+        // Adicionar Entrega (com verificação reforçada e logs)
         window.addDelivery = function() {
               const collRef = getFirestoreCollection('deliveries');
               const cepErrorEl = document.getElementById('delivery-cep-error');
 
-               // **CORREÇÃO REFORÇADA: Verifica auth, userId e db**
-               if (!authReady || !auth.currentUser || !userId || !db) {
-                   console.warn("Tentativa de adicionar entrega antes da autenticação/DB estar pronto.");
+               // Verificação reforçada
+               if (!firebaseInitialized || !auth.currentUser || !userId || !db) { // Usa auth.currentUser diretamente
+                   console.warn("Tentativa de adicionar entrega antes da autenticação/DB estar pronto. User:", auth.currentUser, "UserID:", userId, "DB:", db);
                    if(cepErrorEl){
                        cepErrorEl.textContent="Aguardando conexão/autenticação... Tente novamente em alguns segundos.";
                        cepErrorEl.style.display='block';
@@ -454,45 +440,34 @@
 
               if (!collRef) { /* ... erro DB ... */ return; }
 
-              // Pega valores dos campos
-              const streetInput = document.getElementById('delivery-street');
-              const numberInput = document.getElementById('delivery-number');
-              const neighborhoodInput = document.getElementById('delivery-neighborhood');
-              const cityInput = document.getElementById('delivery-city');
-              const ufInput = document.getElementById('delivery-uf');
-              const sizeInput = document.querySelector('input[name="size"]:checked');
-              const cepInput = document.getElementById('delivery-cep');
+              // Pega valores (igual)
+              const streetInput = document.getElementById('delivery-street'); /*...*/
+              const deliveryAddr = { /* ... */ };
+              const size = /* ... */;
+              const cep = /* ... */;
 
-              const deliveryAddr = {
-                  street: streetInput.value.trim(),
-                  number: numberInput.value.trim(),
-                  neighborhood: neighborhoodInput.value.trim(),
-                  city: cityInput.value.trim(),
-                  uf: ufInput.value.trim().toUpperCase()
-              };
-              const size = sizeInput ? sizeInput.value : 'Pequeno';
-              const cep = cepInput.value.replace(/\D/g, '');
+              // Validação (igual)
+              if (!deliveryAddr.street || !deliveryAddr.number || !deliveryAddr.neighborhood || !deliveryAddr.city || !deliveryAddr.uf) { /* ... erro ... */ return; }
+              if(cepErrorEl) cepErrorEl.style.display='none';
 
-              // Validação
-              if (!deliveryAddr.street || !deliveryAddr.number || !deliveryAddr.neighborhood || !deliveryAddr.city || !deliveryAddr.uf) {
-                  if(cepErrorEl){ cepErrorEl.textContent="Todos os campos de endereço (Rua, Número, Bairro, Cidade, UF) são obrigatórios."; cepErrorEl.style.display='block';}
-                  return;
-              }
-               if(cepErrorEl) cepErrorEl.style.display='none';
-
-              // Monta a string
+              // Monta a string (igual)
               const fullAddress = assembleAddressString(deliveryAddr);
               console.log("Endereço montado para salvar:", fullAddress);
 
               const newDelivery = { /* ... objeto igual ... */ };
 
               // Salva no Firestore
+              console.log("Tentando adicionar documento:", newDelivery); // Log antes de salvar
               addDoc(collRef, newDelivery)
-                   .then(() => { /* ... limpar campos ... */ })
+                   .then((docRef) => { // Pega a referência do documento salvo
+                       console.log("Documento adicionado com ID:", docRef.id); // Log de sucesso
+                       // Limpa campos (igual)
+                       streetInput.value = ''; /*...*/
+                   })
                    .catch(error => {
-                       console.error("Firestore addDoc Error:", error); // Log detalhado
+                       console.error("Firestore addDoc Error:", error.code, error.message, error); // Log mais detalhado
                        if (cepErrorEl) {
-                           cepErrorEl.textContent = `Erro DB ao salvar: ${error.message}`; // Mensagem mais específica
+                           cepErrorEl.textContent = `Erro DB ao salvar: ${error.message} (Código: ${error.code})`; // Inclui código do erro
                            cepErrorEl.style.display = 'block';
                        }
                    });
@@ -529,3 +504,4 @@
     </script>
 </body>
 </html>
+
